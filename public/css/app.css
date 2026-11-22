@@ -544,9 +544,9 @@ a.board-row.is-live:hover { background: #fff5d9; }
 .a-hero .seller .s-ico { width: 40px; height: 40px; border-radius: 6px; background: var(--ink-2); display: grid; place-items: center; color: #a9b7c7; }
 .a-hero .seller b { color: #fff; font-weight: 600; display: block; }
 .a-hero .seller span { font-size: 13px; }
-.a-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 0; border: 1px solid rgba(255, 255, 255, .12); border-radius: var(--radius); overflow: hidden; background: rgba(255, 255, 255, .03); }
-.a-facts > div { padding: 12px 14px; border-left: 1px solid rgba(255, 255, 255, .1); display: flex; gap: 10px; align-items: flex-start; }
-.a-facts > div:first-child { border-left: 0; }
+.a-facts { display: flex; flex-wrap: wrap; align-items: center; gap: 14px 30px; }
+.a-facts > div { display: flex; gap: 10px; align-items: center; }
+.a-facts > div:has(.countdown) { background: #1c3552; border-radius: var(--radius); padding: 10px 18px 10px 14px; }
 .a-facts .ico { color: var(--steel-2); margin-top: 1px; }
 .a-facts span { display: block; font-size: 12px; color: #a9b7c7; }
 .a-facts b { display: block; font-weight: 600; font-size: 14px; font-variant-numeric: tabular-nums; }
@@ -891,10 +891,15 @@ textarea.code-area { font-family: ui-monospace, Menlo, Consolas, monospace; font
   .sell-band .sb-main, .sell-band .sb-side { padding: 24px 20px; }
   .sell-band ul { grid-template-columns: 1fr; }
   .card-grid { grid-template-columns: 1fr; }
-  .a-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .a-facts > div { border-left: 0; border-top: 1px solid rgba(255, 255, 255, .1); }
-  .a-facts > div:nth-child(-n+2) { border-top: 0; }
-  .a-facts > div:nth-child(even) { border-left: 1px solid rgba(255, 255, 255, .1); }
+  /* Facts become a plain list: label on the left, value on the right. */
+  .a-facts { display: block; }
+  .a-facts > div { padding: 12px 0; border-top: 1px solid rgba(255, 255, 255, .1); align-items: flex-start; }
+  .a-facts > div > div { flex: 1; display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
+  .a-facts > div > div b { text-align: right; }
+  .a-facts > div:first-child { border-top: 0; }
+  .a-facts > div:has(.countdown) { padding: 12px 14px; margin-bottom: 4px; align-items: center; }
+  .a-facts > div:has(.countdown) + div { border-top: 0; }
+  .a-facts > div:has(.countdown) > div { align-items: center; }
   .lot-row { grid-template-columns: 1fr; }
   .lot-row .lr-media { aspect-ratio: 16 / 9; min-height: 0; }
   .lot-row .lr-figs { grid-template-columns: repeat(2, minmax(0, 1fr)); }
