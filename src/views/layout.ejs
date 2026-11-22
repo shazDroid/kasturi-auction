@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title ? title + ' | ' + S.site_name : S.site_name %></title>
+  <meta name="csrf-token" content="<%= csrf %>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+  <% if (S.announcement) { %><div class="announce"><div class="wrap"><%= S.announcement %></div></div><% } %>
+  <header class="site-header" id="site-header">
+    <div class="wrap">
+      <a class="brand" href="/"><%= S.site_name %></a>
+      <button class="menu-toggle" type="button" data-toggle="#site-header" aria-label="Open menu">Menu</button>
+      <nav class="nav" aria-label="Main">
+        <a href="/auctions" <%- path.startsWith('/auctions') ? 'aria-current="page"' : '' %>>Auctions</a>
+        <a href="/how-it-works" <%- path === '/how-it-works' ? 'aria-current="page"' : '' %>>How bidding works</a>
+        <a href="/about" <%- path === '/about' ? 'aria-current="page"' : '' %>>About</a>
+        <a href="/contact" <%- path === '/contact' ? 'aria-current="page"' : '' %>>Contact</a>
+      </nav>
+      <div class="nav-side">
+        <% if (user) { %>
+          <a href="/account" <%- path.startsWith('/account') ? 'aria-current="page"' : '' %>>My account</a>
+          <form method="post" action="/logout" class="inline-form"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-quiet btn-sm" type="submit">Sign out</button></form>
+        <% } else { %>
+          <a href="/login">Sign in</a>
+          <% if (S.registration_open === '1') { %><a class="btn btn-accent" href="/register">Register to bid</a><% } %>
+        <% } %>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <% if (!locals.fullBleed) { %><div class="wrap"><%- include('partials/flash') %></div><% } %>
+    <%- body %>
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <div>
+        <h4><%= S.site_name %></h4>
+        <% if (S.contact_address) { %><div><%= S.contact_address %></div><% } %>
+        <div><%= S.contact_email %><% if (S.contact_phone) { %>, <%= S.contact_phone %><% } %></div>
+        <% if (S.support_hours) { %><div><%= S.support_hours %></div><% } %>
+      </div>
+      <div>
+        <h4>Bidding</h4>
+        <a href="/auctions">Auction schedule</a>
+        <a href="/how-it-works">How bidding works</a>
+        <a href="/register">Register as a bidder</a>
+      </div>
+      <div>
+        <h4>Company</h4>
+        <a href="/about">About</a>
+        <a href="/terms">Terms and conditions</a>
+        <a href="/privacy">Privacy policy</a>
+        <a href="/contact">Contact</a>
+      </div>
+    </div>
+  </footer>
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <script src="/js/site.js"></script>
+  <% (locals.scripts || []).forEach(function (s) { %><script src="<%= s %>"></script><% }) %>
+</body>
+</html>

@@ -1,0 +1,43 @@
+<div class="page-head">
+  <div>
+    <h1>Mark payment as refunded</h1>
+    <p>This only updates the record here. Make the refund itself in the Razorpay dashboard or by bank transfer.</p>
+  </div>
+</div>
+<div class="mid">
+  <div class="panel">
+    <div class="panel-body">
+      <dl class="kv">
+        <dt>Bidder</dt><dd><a href="/admin/bidders/<%= p.user_id %>"><%= p.name %></a>, <%= p.company_name %></dd>
+        <dt>Amount</dt><dd><%= fmtINR(p.amount) %> (<%= fmtINR(p.base_amount) %> + GST <%= fmtINR(p.tax_amount) %>)</dd>
+        <dt>Paid</dt><dd><%= fmtDT(p.paid_at) %>, <%= p.method === 'offline' ? 'offline' : 'Razorpay' %></dd>
+        <% if (p.rp_payment_id) { %><dt>Razorpay payment</dt><dd><span class="code"><%= p.rp_payment_id %></span></dd><% } %>
+        <% if (p.note) { %><dt>Note</dt><dd><%= p.note %></dd><% } %>
+        <dt>Status</dt><dd><%- tag('payment', p.status) %></dd>
+        <dt>Fee valid until</dt><dd><%= feeText || 'Not valid' %></dd>
+      </dl>
+    </div>
+  </div>
+  <% if (p.status === 'paid') { %>
+  <form method="post" action="/admin/payments/<%= p.id %>/mark-refunded" class="panel">
+    <div class="panel-body">
+      <%- include('_csrf') %>
+      <input type="hidden" name="back" value="/admin/payments">
+      <div class="field">
+        <label for="note">Refund note</label>
+        <input type="text" id="note" name="note" maxlength="500" required placeholder="Razorpay refund id or bank reference, and the reason">
+      </div>
+      <div class="check">
+        <input type="checkbox" id="revoke" name="revoke" value="1" checked>
+        <div><label for="revoke">Also remove the bidder's fee validity</label><div class="hint">They will have to pay again before they can bid.</div></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-danger" type="submit">Mark as refunded</button>
+        <a class="btn btn-quiet" href="/admin/payments">Cancel</a>
+      </div>
+    </div>
+  </form>
+  <% } else { %>
+    <div class="notice">Only paid payments can be marked as refunded.</div>
+  <% } %>
+</div>

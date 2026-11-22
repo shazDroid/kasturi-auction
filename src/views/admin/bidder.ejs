@@ -1,0 +1,211 @@
+<div class="page-head">
+  <div>
+    <h1><%= u.name %></h1>
+    <p class="row"><span class="code"><%= bidderNo(u.id) %></span> <span><%= u.company_name || 'No company entered' %></span> <%- tag('kyc', u.kyc_status) %> <% if (u.blocked) { %><span class="tag tag-bad">Blocked</span><% } %></p>
+  </div>
+  <a class="btn btn-quiet" href="/admin/bidders/<%= u.id %>/edit">Edit details</a>
+</div>
+
+<div class="cols">
+  <div>
+    <div class="panel">
+      <div class="panel-head"><h3>Business details</h3><span class="muted small">Registered <%= fmtDT(u.created_at) %></span></div>
+      <div class="panel-body">
+        <dl class="kv">
+          <dt>Contact person</dt><dd><%= u.name %></dd>
+          <dt>Company</dt><dd><%= u.company_name || 'Not entered' %></dd>
+          <dt>Business type</dt><dd><%= u.business_type || 'Not entered' %></dd>
+          <dt>GSTIN</dt><dd><%= u.gstin ? u.gstin : 'Not entered' %></dd>
+          <dt>PAN</dt><dd><%= u.pan ? u.pan : 'Not entered' %></dd>
+          <dt>Address</dt><dd><%= [u.address, u.city, u.state, u.pincode].filter(Boolean).join(', ') || 'Not entered' %></dd>
+          <dt>Email</dt><dd><a href="mailto:<%= u.email %>"><%= u.email %></a> <%- u.email_verified ? tag('yesno', true, 'Verified') : tag('yesno', false, 'Not verified') %></dd>
+          <dt>Phone</dt><dd><%= u.phone || 'Not entered' %></dd>
+          <dt>Auction emails</dt><dd><%= u.email_opt_out ? 'Turned off by the bidder' : 'Receives announcements and reminders' %></dd>
+          <dt>Last sign in</dt><dd><%= u.last_login_at ? fmtDT(u.last_login_at) : 'Never' %></dd>
+          <dt>Activity</dt><dd><%= stats.bids %> bid<%= stats.bids === 1 ? '' : 's' %> in <%= stats.auctions %> auction<%= stats.auctions === 1 ? '' : 's' %>, <%= stats.won %> lot<%= stats.won === 1 ? '' : 's' %> won</dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Documents</h3><%- tag('kyc', u.kyc_status) %></div>
+      <div class="panel-body">
+        <% if (u.kyc_status === 'pending') { %>
+          <div class="notice notice-warn"><p>Submitted <%= u.kyc_submitted_at ? fmtDT(u.kyc_submitted_at) : '' %>. Check each document against the GSTIN, PAN and company name above, then approve or reject.</p></div>
+        <% } else if (u.kyc_status === 'rejected' && u.kyc_note) { %>
+          <div class="notice notice-error"><p>Rejected: <%= u.kyc_note %></p></div>
+        <% } %>
+        <% if (!docs.length) { %>
+          <p class="muted">No documents uploaded yet.</p>
+        <% } else { %>
+          <div class="table-wrap flat">
+            <table class="table">
+              <thead><tr><th>Document</th><th>File</th><th>Uploaded</th><th></th></tr></thead>
+              <tbody>
+              <% docs.forEach(function (d) { %>
+                <tr>
+                  <td><b><%= d.doc_type %></b></td>
+                  <td><%= d.filename %><span class="sub"><%= d.mime === 'application/pdf' ? 'PDF' : 'Image' %>, <%= fmtSize(d.size) %></span></td>
+                  <td class="nowrap"><%= fmtDT(d.created_at) %></td>
+                  <td class="actions"><a href="/admin/documents/<%= d.id %>" target="_blank" rel="noopener">View</a><a href="/admin/documents/<%= d.id %>?download=1">Download</a></td>
+                </tr>
+              <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+
+        <div class="kyc-actions mt">
+          <% if (u.kyc_status !== 'approved') { %>
+            <form method="post" action="/admin/bidders/<%= u.id %>/kyc/approve" class="inline-form"><%- include('_csrf') %>
+              <button class="btn" type="submit" <%- !docs.length ? 'data-confirm="This bidder has not uploaded any documents. Approve anyway?"' : '' %>>Approve bidder</button>
+            </form>
+          <% } %>
+          <% if (u.kyc_status !== 'incomplete') { %>
+            <form method="post" action="/admin/bidders/<%= u.id %>/kyc/reset" class="inline-form"><%- include('_csrf') %>
+              <button class="btn btn-quiet" type="submit" data-confirm="Reset verification? The bidder must submit documents again and cannot bid until approved.">Ask to resubmit</button>
+            </form>
+          <% } %>
+        </div>
+                <form method="post" action="/admin/bidders/<%= u.id %>/kyc/reject" class="mt">
+          <%- include('_csrf') %>
+          <div class="field">
+            <label for="reason">Reason for rejecting</label>
+            <textarea id="reason" name="reason" rows="2" maxlength="1000" required placeholder="For example: PAN card name does not match the company name. Upload the company PAN."></textarea>
+            <div class="hint">Emailed to the bidder and shown on their verification page.</div>
+          </div>
+          <button class="btn btn-danger" type="submit">Reject documents</button>
+        </form>
+      </div>
+    </div>
+
+    <section class="admin-section">
+      <div class="row-between"><h2>Bids</h2><span class="muted small">Latest 50</span></div>
+      <div class="table-wrap">
+      <% if (!bids.length) { %>
+        <div class="empty"><h3>No bids</h3><p>This bidder has not bid in any auction.</p></div>
+      <% } else { %>
+        <table class="table table-stack">
+          <thead><tr><th>Time</th><th>Auction and lot</th><th class="num">Amount</th><th>Outcome</th></tr></thead>
+          <tbody>
+          <% bids.forEach(function (b) { %>
+            <tr class="<%= b.cancelled ? 'void' : '' %>">
+              <td data-label="Time" class="nowrap"><%= fmtDTs(b.created_at) %></td>
+              <td class="cell-main"><a href="/admin/lots/<%= b.lot_id %>">Lot <%= b.lot_no %>: <%= b.lot_title %></a><span class="sub"><a href="/admin/auctions/<%= b.auction_id %>"><%= b.auction_title %></a></span></td>
+              <td class="num amt" data-label="Amount"><%= fmtINR(b.amount) %></td>
+              <td data-label="Outcome">
+                <% if (b.cancelled) { %><span class="tag tag-bad">Cancelled</span>
+                <% } else if (b.lot_status === 'open') { %><span class="tag tag-live">Lot open</span>
+                <% } else if (Number(b.winning_bid_id) === Number(b.id)) { %><%- tag('result', b.result, b.result === 'pending' ? 'Highest, awaiting decision' : b.result === 'awarded' ? 'Won' : 'Highest, rejected') %>
+                <% } else { %><span class="tag">Outbid</span><% } %>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+      </div>
+    </section>
+
+    <section class="admin-section">
+      <h2>Payments</h2>
+      <div class="table-wrap">
+      <% if (!pays.length) { %>
+        <div class="empty"><h3>No payments</h3><p>Online payments and offline fees you record appear here.</p></div>
+      <% } else { %>
+        <table class="table table-stack">
+          <thead><tr><th>Date</th><th class="num">Total</th><th>Method</th><th>Status</th><th>Reference</th><th></th></tr></thead>
+          <tbody>
+          <% pays.forEach(function (p) { %>
+            <tr>
+              <td data-label="Date" class="nowrap"><%= fmtDT(p.paid_at || p.created_at) %></td>
+              <td class="num" data-label="Total"><%= fmtINR(p.amount) %><span class="sub"><%= fmtINR(p.base_amount) %> + GST <%= fmtINR(p.tax_amount) %></span></td>
+              <td data-label="Method"><%= p.method === 'offline' ? 'Offline' : 'Razorpay' %></td>
+              <td data-label="Status"><%- tag('payment', p.status) %></td>
+              <td data-label="Reference"><% if (p.rp_payment_id) { %><span class="code"><%= p.rp_payment_id %></span><% } %><% if (p.note) { %><span class="sub"><%= p.note %></span><% } %></td>
+              <td class="actions"><% if (p.status === 'paid') { %><a href="/admin/payments/<%= p.id %>/refund">Mark refunded</a><% } %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+      </div>
+    </section>
+  </div>
+
+  <div class="side-stack">
+    <div class="panel">
+      <div class="panel-head"><h3>Can bid</h3><%- el.ok ? tag('yesno', true, 'Yes') : tag('result', 'rejected', 'Not yet') %></div>
+      <div class="panel-body">
+        <ul class="steps">
+          <% if (el.blocked) { %><li><span class="mark"></span><span class="grow">Account is blocked</span></li><% } %>
+          <% el.steps.forEach(function (s) { %>
+            <li class="<%= s.done ? 'done' : '' %>"><span class="mark"></span><span class="grow"><%= s.key === 'email' ? 'Email verified' : s.key === 'kyc' ? 'Documents approved' : 'Registration fee paid' %></span></li>
+          <% }) %>
+          <% if (!el.steps.length && !el.blocked) { %><li><span class="grow muted">No checks are required in Settings.</span></li><% } %>
+        </ul>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Registration fee</h3><%- feeActive ? tag('yesno', true, 'Valid') : tag('yesno', false, u.fee_paid_until ? 'Expired' : 'Not paid') %></div>
+      <div class="panel-body">
+        <p><%= u.fee_paid_until ? (feeActive ? 'Valid until ' : 'Expired on ') + feeText : 'This bidder has not paid the fee.' %></p>
+        <form method="post" action="/admin/bidders/<%= u.id %>/fee/offline">
+          <%- include('_csrf') %>
+          <div class="field">
+            <label for="fee-note">Record a payment received offline</label>
+            <input type="text" id="fee-note" name="note" maxlength="500" required placeholder="NEFT UTR, cheque number or receipt">
+            <div class="hint">Records <%= fmtINR(quote.total) %> (<%= fmtINR(quote.base) %> + <%= quote.gstPercent %>% GST) and extends validity by <%= quote.validityDays > 0 ? quote.validityDays + ' days' : 'no expiry' %>. A receipt is emailed.</div>
+          </div>
+          <button class="btn btn-sm" type="submit" data-confirm="Record an offline fee payment of <%= fmtINR(quote.total) %> for <%= u.name %>?">Record offline payment</button>
+        </form>
+        <% if (u.fee_paid_until) { %>
+        <form method="post" action="/admin/bidders/<%= u.id %>/fee/revoke" class="mt"><%- include('_csrf') %>
+          <button class="linkbtn danger" type="submit" data-confirm="Remove this bidder's fee validity? They must pay again before bidding.">Revoke fee validity</button>
+        </form>
+        <% } %>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Account</h3></div>
+      <div class="panel-body stack-sm">
+        <% if (!u.email_verified) { %>
+          <form method="post" action="/admin/bidders/<%= u.id %>/verify-email"><%- include('_csrf') %>
+            <button class="btn btn-quiet btn-sm" type="submit" data-confirm="Mark <%= u.email %> as verified without the bidder clicking the link?">Mark email as verified</button>
+          </form>
+          <form method="post" action="/admin/bidders/<%= u.id %>/resend-verification"><%- include('_csrf') %>
+            <button class="btn btn-quiet btn-sm" type="submit">Send verification link again</button>
+          </form>
+        <% } %>
+        <% if (u.blocked) { %>
+          <form method="post" action="/admin/bidders/<%= u.id %>/unblock"><%- include('_csrf') %>
+            <button class="btn btn-sm" type="submit" data-confirm="Unblock <%= u.name %>? They can sign in and bid again if otherwise eligible.">Unblock bidder</button>
+          </form>
+        <% } else { %>
+          <form method="post" action="/admin/bidders/<%= u.id %>/block"><%- include('_csrf') %>
+            <button class="btn btn-danger btn-sm" type="submit" data-confirm="Block <%= u.name %>? They are signed out at once and cannot bid. Existing bids stay.">Block bidder</button>
+          </form>
+        <% } %>
+      </div>
+    </div>
+
+    <form method="post" action="/admin/bidders/<%= u.id %>/email" class="panel">
+      <div class="panel-head"><h3>Email this bidder</h3></div>
+      <div class="panel-body">
+        <%- include('_csrf') %>
+        <div class="field">
+          <label for="m-subject">Subject</label>
+          <input type="text" id="m-subject" name="subject" maxlength="200" required>
+        </div>
+        <div class="field">
+          <label for="m-message">Message</label>
+          <textarea id="m-message" name="message" rows="5" required></textarea>
+          <div class="hint">Plain text. Sent to <%= u.email %> in the standard email layout.</div>
+        </div>
+        <button class="btn btn-sm" type="submit">Send email</button>
+      </div>
+    </form>
+  </div>
+</div>

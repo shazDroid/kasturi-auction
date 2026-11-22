@@ -1,0 +1,70 @@
+<div class="page-head">
+  <div>
+    <h1>Payments</h1>
+    <p>Registration fees paid online through Razorpay or recorded offline. Dates are IST.</p>
+  </div>
+  <a class="btn btn-quiet" href="<%= urlWith({ page: '' }).replace('/admin/payments', '/admin/payments.csv') %>">Download CSV</a>
+</div>
+
+<% if (!rpOn) { %>
+  <div class="notice notice-warn"><p>Online payment is off: Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET on the server, and RAZORPAY_WEBHOOK_SECRET for payment confirmations. Until then, record fees from the bidder's page.</p></div>
+<% } %>
+
+<form class="filters" method="get" action="/admin/payments">
+  <label class="sr" for="f-q">Search</label>
+  <input type="search" id="f-q" name="q" value="<%= f.q %>" placeholder="Bidder, company, Razorpay id or note">
+  <label class="sr" for="f-status">Status</label>
+  <select id="f-status" name="status">
+    <option value="">Any status</option>
+    <% STATUSES.forEach(function (s) { %><option value="<%= s %>" <%= f.status === s ? 'selected' : '' %>><%= { paid: 'Paid', created: 'Not completed', failed: 'Failed', refunded: 'Refunded' }[s] %></option><% }) %>
+  </select>
+  <label class="sr" for="f-method">Method</label>
+  <select id="f-method" name="method">
+    <option value="">Any method</option>
+    <option value="razorpay" <%= f.method === 'razorpay' ? 'selected' : '' %>>Razorpay</option>
+    <option value="offline" <%= f.method === 'offline' ? 'selected' : '' %>>Offline</option>
+  </select>
+  <label for="f-from">From</label>
+  <input type="date" id="f-from" name="from" value="<%= f.from %>">
+  <label for="f-to">to</label>
+  <input type="date" id="f-to" name="to" value="<%= f.to %>">
+  <button class="btn btn-quiet" type="submit">Filter</button>
+  <% if (f.q || f.status || f.method || f.from || f.to) { %><a href="/admin/payments">Clear filters</a><% } %>
+</form>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty"><h3>No payments<%= (f.q || f.status || f.method || f.from || f.to) ? ' match these filters' : ' yet' %></h3><p>Fees appear here when a bidder pays online or when you record an offline payment on a bidder's page.</p></div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Date</th><th>Bidder</th><th>Purpose</th><th class="num">Base</th><th class="num">GST</th><th class="num">Total</th><th>Method</th><th>Status</th><th>Razorpay ids</th><th>Note</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (p) { %>
+      <tr>
+        <td data-label="Date" class="nowrap"><%= fmtDate(p.paid_at || p.created_at) %><span class="sub"><%= fmtTime(p.paid_at || p.created_at) %></span></td>
+        <td class="cell-main"><a class="primary" href="/admin/bidders/<%= p.user_id %>"><%= p.name %></a><span class="sub"><%= p.company_name %></span></td>
+        <td data-label="Purpose"><%= p.purpose === 'registration_fee' ? 'Registration fee' : p.purpose %></td>
+        <td class="num" data-label="Base"><%= fmtINR(p.base_amount) %></td>
+        <td class="num" data-label="GST"><%= fmtINR(p.tax_amount) %></td>
+        <td class="num" data-label="Total"><b><%= fmtINR(p.amount) %></b></td>
+        <td data-label="Method"><%= p.method === 'offline' ? 'Offline' : 'Razorpay' %></td>
+        <td data-label="Status"><%- tag('payment', p.status) %></td>
+        <td data-label="Razorpay ids"><% if (p.rp_order_id) { %><span class="code"><%= p.rp_order_id %></span><% } %><% if (p.rp_payment_id) { %><span class="sub"><span class="code"><%= p.rp_payment_id %></span></span><% } %></td>
+        <td data-label="Note" class="note-cell"><%= p.note %></td>
+        <td class="actions"><% if (p.status === 'paid') { %><a href="/admin/payments/<%= p.id %>/refund">Mark refunded</a><% } %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3">Paid in this view: <%= totals.paid_n %> payment<%= totals.paid_n === 1 ? '' : 's' %></td>
+        <td class="num"><%= fmtINR(totals.base) || '₹0' %></td>
+        <td class="num"><%= fmtINR(totals.tax) || '₹0' %></td>
+        <td class="num"><%= fmtINR(totals.amount) || '₹0' %></td>
+        <td colspan="5"></td>
+      </tr>
+    </tfoot>
+  </table>
+<% } %>
+</div>
+<%- include('_pager') %>

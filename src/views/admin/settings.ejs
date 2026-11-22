@@ -1,0 +1,80 @@
+<div class="page-head">
+  <div>
+    <h1>Settings</h1>
+    <p>Business details and the rules for registration, fees, bidding and email. Changes apply as soon as you save.</p>
+  </div>
+</div>
+
+<nav class="tabs" aria-label="Settings sections">
+  <% groups.forEach(function (g, i) { %><a href="#group-<%= i %>"><%= g.name %></a><% }) %>
+  <a href="#integrations">Integrations</a>
+</nav>
+
+<form method="post" action="/admin/settings" novalidate>
+  <%- include('_csrf') %>
+  <% groups.forEach(function (g, i) { %>
+    <fieldset class="panel settings-group" id="group-<%= i %>">
+      <legend class="panel-head"><%= g.name %></legend>
+      <div class="panel-body">
+        <div class="form-grid">
+        <% g.defs.forEach(function (d) { var val = values[d.key] === undefined ? d.def : values[d.key]; var err = errors[d.key]; %>
+          <% if (d.type === 'bool') { %>
+            <div class="check full">
+              <input type="checkbox" id="s-<%= d.key %>" name="<%= d.key %>" value="1" <%= val === '1' ? 'checked' : '' %>>
+              <div><label for="s-<%= d.key %>"><%= d.label %></label><% if (d.help) { %><div class="hint"><%= d.help %></div><% } %></div>
+            </div>
+          <% } else { %>
+            <div class="field <%= d.type === 'textarea' || d.type === 'text' && (d.help || '').length > 60 ? 'full' : '' %>">
+              <label for="s-<%= d.key %>"><%= d.label %></label>
+              <% if (d.type === 'textarea') { %>
+                <textarea id="s-<%= d.key %>" name="<%= d.key %>" rows="3"><%= val %></textarea>
+              <% } else if (d.type === 'number') { %>
+                <input type="number" id="s-<%= d.key %>" name="<%= d.key %>" value="<%= val %>" min="0" step="any" class="input-num" <%- err ? 'aria-invalid="true"' : '' %>>
+              <% } else { %>
+                <input type="<%= d.type === 'email' ? 'email' : 'text' %>" id="s-<%= d.key %>" name="<%= d.key %>" value="<%= val %>" maxlength="500" <%- err ? 'aria-invalid="true"' : '' %>>
+              <% } %>
+              <% if (err) { %><div class="err"><%= err %></div><% } %>
+              <% if (d.help) { %><div class="hint"><%= d.help %></div><% } %>
+            </div>
+          <% } %>
+        <% }) %>
+        </div>
+      </div>
+    </fieldset>
+  <% }) %>
+  <div class="form-actions save-bar">
+    <button class="btn" type="submit">Save settings</button>
+    <span class="muted small">Saves every section on this page.</span>
+  </div>
+</form>
+
+<div class="panel" id="integrations">
+  <div class="panel-head"><h3>Integrations</h3><span class="muted small">Set on the server as environment variables, then restart</span></div>
+  <div class="table-wrap flat">
+    <table class="table table-stack">
+      <thead><tr><th>Service</th><th>Configured</th><th>Environment variables</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="cell-main"><b>Razorpay payments</b><span class="sub">Online registration fee payment</span></td>
+          <td data-label="Configured"><%- tag('yesno', intg.razorpay.ok) %></td>
+          <td data-label="Variables"><% intg.razorpay.keys.forEach(function (k) { %><span class="code"><%= k %></span> <% }) %></td>
+        </tr>
+        <tr>
+          <td class="cell-main"><b>Razorpay webhook</b><span class="sub">Confirms payments if the bidder closes the window early. Webhook URL: <span class="code"><%= intg.webhookUrl %></span></span></td>
+          <td data-label="Configured"><%- tag('yesno', intg.webhook.ok) %></td>
+          <td data-label="Variables"><% intg.webhook.keys.forEach(function (k) { %><span class="code"><%= k %></span> <% }) %></td>
+        </tr>
+        <tr>
+          <td class="cell-main"><b>Email delivery</b><span class="sub"><%= intg.mail.ok ? 'Sending through ' + (intg.mail.transport === 'brevo' ? 'Brevo' : 'SMTP') : 'Not connected: emails are logged but not sent' %></span></td>
+          <td data-label="Configured"><%- tag('yesno', intg.mail.ok) %></td>
+          <td data-label="Variables"><span class="code">BREVO_API_KEY</span> or <span class="code">SMTP_HOST</span> <span class="code">SMTP_PORT</span> <span class="code">SMTP_USER</span> <span class="code">SMTP_PASS</span></td>
+        </tr>
+        <tr>
+          <td class="cell-main"><b>Site address</b><span class="sub">Used for links in emails. Now: <span class="code"><%= intg.siteUrl %></span></span></td>
+          <td data-label="Configured"><%- tag('yesno', intg.baseUrl.ok) %></td>
+          <td data-label="Variables"><span class="code">BASE_URL</span></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>

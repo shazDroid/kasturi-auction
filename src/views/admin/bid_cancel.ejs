@@ -1,0 +1,40 @@
+<div class="page-head">
+  <div>
+    <h1>Cancel bid</h1>
+    <p>Use this for a clear mistake, such as an extra zero. The bid stays in the record, marked as cancelled.</p>
+  </div>
+</div>
+<div class="mid">
+  <% if (bid.cancelled) { %><div class="notice">This bid is already cancelled<%= bid.cancel_note ? ': ' + bid.cancel_note : '' %>.</div><% } %>
+  <div class="panel">
+    <div class="panel-body">
+      <dl class="kv">
+        <dt>Auction</dt><dd><a href="/admin/auctions/<%= bid.auction_id %>"><%= bid.auction_title %></a></dd>
+        <dt>Lot</dt><dd>Lot <%= bid.lot_no %>, <%= bid.lot_title %></dd>
+        <dt>Bidder</dt><dd><a href="/admin/bidders/<%= bid.user_id %>"><%= bid.name %></a>, <%= bid.company_name %> (<%= bidderNo(bid.user_id) %>)</dd>
+        <dt>Amount</dt><dd><%= fmtINR(bid.amount) %></dd>
+        <dt>Placed</dt><dd><%= fmtDTs(bid.created_at) %> from <span class="code"><%= bid.ip || 'unknown IP' %></span></dd>
+      </dl>
+    </div>
+  </div>
+  <% if (!bid.cancelled) { %>
+  <form method="post" action="/admin/bids/<%= bid.id %>/cancel" class="panel">
+    <div class="panel-body">
+      <%- include('_csrf') %>
+      <% if (bid.lot_status === 'closed' && Number(bid.winning_bid_id) === Number(bid.id)) { %>
+        <div class="notice notice-warn">This is the winning bid of a closed lot. After cancelling, the next highest bid becomes the leading bid and the lot goes back to "Awaiting decision".</div>
+      <% } %>
+      <div class="field">
+        <label for="note">Reason for cancelling</label>
+        <textarea id="note" name="note" rows="3" maxlength="500" required placeholder="For example: bidder called at 3:12 pm, typed 4,15,000 instead of 41,500"></textarea>
+        <% if (error) { %><div class="err"><%= error %></div><% } %>
+        <div class="hint">Kept with the bid and in the activity log. The bidder is not emailed.</div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-danger" type="submit">Cancel this bid</button>
+        <a class="btn btn-quiet" href="/admin/auctions/<%= bid.auction_id %>">Keep the bid</a>
+      </div>
+    </div>
+  </form>
+  <% } %>
+</div>

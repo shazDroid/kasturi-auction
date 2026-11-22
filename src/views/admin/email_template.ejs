@@ -1,0 +1,69 @@
+<div class="page-head">
+  <div>
+    <h1><%= t.name %></h1>
+    <p><%= t.description %></p>
+  </div>
+  <div class="row">
+    <form method="post" action="/admin/emails/templates/<%= t.key %>/test" class="inline-form"><%- include('_csrf') %>
+      <button class="btn btn-quiet" type="submit" title="Uses the saved version">Send test to me</button>
+    </form>
+  </div>
+</div>
+
+<div class="cols-even">
+  <form method="post" action="/admin/emails/templates/<%= t.key %>" class="panel" id="template-form" novalidate>
+    <div class="panel-body">
+      <%- include('_csrf') %>
+      <div class="field">
+        <label for="subject">Subject</label>
+        <input type="text" id="subject" name="subject" value="<%= t.subject %>" maxlength="300" required>
+      </div>
+      <div class="field">
+        <label for="body">Body (HTML)</label>
+        <textarea id="body" name="body" class="code-area" rows="18" spellcheck="false" required><%= t.body %></textarea>
+        <div class="hint">Use &lt;p&gt;, &lt;br&gt;, &lt;b&gt;, &lt;ol&gt;/&lt;ul&gt; with &lt;li&gt;, and &lt;a href=""&gt;. <span class="code">&lt;a class="btn" href="..."&gt;</span> makes a button and <span class="code">&lt;table class="details"&gt;</span> a bordered details table. The header and footer are added automatically.</div>
+      </div>
+      <div class="field">
+        <span class="label">Variables you can use</span>
+        <div class="chips">
+          <% vars.forEach(function (v) { %><span class="code">{{<%= v %>}}</span><% }) %>
+          <% always.forEach(function (v) { %><span class="code muted">{{<%= v %>}}</span><% }) %>
+        </div>
+        <div class="hint">Values from bidders are escaped automatically. The greyed variables work in every template.</div>
+      </div>
+      <div class="check">
+        <input type="checkbox" id="enabled" name="enabled" value="1" <%= t.enabled ? 'checked' : '' %>>
+        <div><label for="enabled">Send this email</label><div class="hint">When off, this email is not sent at all.</div></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn" type="submit">Save template</button>
+        <a class="btn btn-quiet" href="/admin/emails/templates">Back to templates</a>
+      </div>
+    </div>
+  </form>
+
+  <div>
+    <div class="panel">
+      <div class="panel-head"><h3>Preview</h3><span class="muted small">With sample details; updates as you type</span></div>
+      <div class="panel-body">
+        <iframe class="mail-preview mail-preview-tall" name="mail-preview" id="mail-preview" sandbox title="Email preview" src="/admin/emails/templates/<%= t.key %>/preview"></iframe>
+      </div>
+    </div>
+    <% if (hasDefault) { %>
+    <div class="panel">
+      <div class="panel-body">
+        <form method="post" action="/admin/emails/templates/<%= t.key %>/restore"><%- include('_csrf') %>
+          <p class="muted small">Undo all edits and go back to the original subject and wording.</p>
+          <button class="btn btn-danger btn-sm" type="submit" data-confirm="Replace the subject and body with the original wording? Your edits will be lost.">Restore default</button>
+        </form>
+      </div>
+    </div>
+    <% } %>
+  </div>
+</div>
+
+<form method="post" action="/admin/emails/templates/<%= t.key %>/preview" target="mail-preview" id="preview-form" class="hide">
+  <%- include('_csrf') %>
+  <input type="hidden" name="subject">
+  <input type="hidden" name="body">
+</form>

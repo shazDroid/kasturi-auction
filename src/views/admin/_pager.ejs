@@ -1,0 +1,10 @@
+<% if (pg.total > 0) { %>
+<nav class="pager" aria-label="Pages">
+  <span><%= pg.total === 1 ? '1 record' : (pg.pages > 1 ? fmtNum(pg.offset + 1) + ' to ' + fmtNum(Math.min(pg.offset + pg.per, pg.total)) + ' of ' : '') + fmtNum(pg.total) + (pg.pages > 1 ? '' : ' records') %></span>
+  <% if (pg.pages > 1) { %>
+    <% if (pg.page > 1) { %><a class="btn btn-quiet btn-sm" href="<%= urlWith({ page: pg.page - 1 }) %>">Previous</a><% } %>
+    <span>Page <%= pg.page %> of <%= pg.pages %></span>
+    <% if (pg.page < pg.pages) { %><a class="btn btn-quiet btn-sm" href="<%= urlWith({ page: pg.page + 1 }) %>">Next</a><% } %>
+  <% } %>
+</nav>
+<% } %>

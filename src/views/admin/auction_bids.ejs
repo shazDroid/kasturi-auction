@@ -1,0 +1,20 @@
+<div class="page-head">
+  <div>
+    <h1>Bid history</h1>
+    <p><a href="/admin/auctions/<%= a.id %>"><%= a.title %></a>. Every bid placed, including cancelled ones. Times are IST.</p>
+  </div>
+  <a class="btn btn-quiet" href="/admin/auctions/<%= a.id %>/bids.csv">Download CSV</a>
+</div>
+
+<form class="filters" method="get" action="/admin/auctions/<%= a.id %>/bids">
+  <label class="sr" for="f-lot">Lot</label>
+  <select id="f-lot" name="lot">
+    <option value="">All lots</option>
+    <% lots.forEach(function (l) { %><option value="<%= l.id %>" <%= lotId === l.id ? 'selected' : '' %>>Lot <%= l.lot_no %>: <%= l.title %></option><% }) %>
+  </select>
+  <button class="btn btn-quiet" type="submit">Filter</button>
+  <% if (lotId) { %><a href="/admin/auctions/<%= a.id %>/bids">Show all lots</a><% } %>
+</form>
+
+<%- include('_bids_table', { bids: bids, showLot: true, emptyText: lotId ? 'Nobody has bid on this lot.' : 'Nobody has bid in this auction.' }) %>
+<%- include('_pager') %>

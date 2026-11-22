@@ -1,0 +1,194 @@
+<%
+  var a = auction;
+  var phase = a.phase;
+  var live = phase === 'live';
+  var upcoming = phase === 'upcoming';
+  var plural = function (n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); };
+  var loginHref = '/login?next=' + encodeURIComponent('/auctions/' + a.id);
+
+  // Result text for a closed lot. Kept in step with resultFor() in public/js/room.js.
+  function resultFor(l) {
+    if (l.result === 'awarded') return l.won ? ['Awarded to you', 'tag-ok'] : ['Sold', ''];
+    if (l.result === 'pending') return ['Awaiting seller decision', 'tag-warn'];
+    if (l.result === 'rejected') return ['Not sold', ''];
+    if (l.result === 'no_bids') return ['No bids', ''];
+    return ['Closed', ''];
+  }
+  function rowClass(l) {
+    if (!user || l.myBid === null || l.myBid === undefined) return '';
+    if (l.status === 'closed') return l.won ? 'leading' : '';
+    return l.leading ? 'leading' : 'outbid';
+  }
+%>
+<div class="wrap" data-server-now="<%= serverNow %>">
+  <div class="page-head">
+    <div class="row auction-tags">
+      <% if (live) { %><span class="tag tag-live">Live</span><% } else if (upcoming) { %><span class="tag tag-upcoming">Upcoming</span><% } else { %><span class="tag">Closed</span><% } %>
+      <% if (a.category) { %><span class="muted small"><%= a.category %></span><% } %>
+    </div>
+    <h1><%= a.title %></h1>
+    <p><% if (a.seller_name) { %>Listed by <%= a.seller_name %>.<% } %><% if (a.location) { %> Material is at <%= a.location %>.<% } %>
+      <% if (upcoming) { %> Bidding opens <%= fmtDT(a.starts_at) %> IST.<% } else if (!live) { %> Closed on <%= fmtDate(lastClose) %>.<% } %></p>
+  </div>
+
+  <div class="cols room-cols">
+    <div class="room-main">
+      <% if (!canSeeLots) { %>
+        <div class="panel">
+          <div class="panel-body">
+            <h2>Sign in to see the lots</h2>
+            <p>Lot details, quantities and prices are shown to registered bidders only.</p>
+            <div class="form-actions">
+              <a class="btn" href="<%= loginHref %>">Sign in</a>
+              <% if (S.registration_open === '1') { %><a class="btn btn-quiet" href="/register">Register to bid</a><% } %>
+            </div>
+          </div>
+        </div>
+      <% } else { %>
+        <% if (live || upcoming) { %>
+          <div class="room-bar" id="room-bar">
+            <% if (live) { %>
+              <div class="item"><span>Auction</span><b id="rb-phase">Live</b></div>
+              <div class="item"><span>Last lot closes in</span><b class="countdown" id="rb-last" data-countdown="<%= lastClose %>" data-done="Closing"></b></div>
+            <% } else { %>
+              <div class="item"><span>Bidding starts in</span><b class="countdown" data-countdown="<%= state.startsAt %>" data-done="Starting"></b></div>
+            <% } %>
+            <div class="item"><span>Server time, IST</span><b id="rb-clock"><%= fmtTime(new Date(serverNow)) %></b></div>
+            <div class="item"><span>Lots open</span><b id="rb-open"><%= openCount %> of <%= lots.length %></b></div>
+            <% if (user) { %><div class="item"><span>You are leading</span><b id="rb-leading"><%= plural(leadingCount, 'lot') %></b></div><% } %>
+            <div class="conn" id="rb-conn"><span class="dot" aria-hidden="true"></span><span id="rb-conn-text">Connecting</span></div>
+          </div>
+        <% } %>
+
+        <% if (!lots.length) { %>
+          <div class="table-wrap"><div class="empty"><h3>No lots listed yet</h3><p>The seller is still preparing this catalogue. Check back before the auction starts.</p></div></div>
+        <% } else { %>
+          <div class="table-wrap">
+            <table class="table table-stack lots" id="lots"
+                   data-auction="<%= a.id %>" data-phase="<%= phase %>" data-starts="<%= state.startsAt %>"
+                   data-user="<%= user ? 1 : 0 %>" data-can-bid="<%= canBid ? 1 : 0 %>">
+              <thead>
+                <tr>
+                  <th>Lot</th>
+                  <th class="num">Start price</th>
+                  <th class="num">Highest bid</th>
+                  <th><%= live ? 'Closes in' : 'Closes' %></th>
+                  <th><%= live || upcoming ? 'Your bid' : 'Result' %></th>
+                </tr>
+              </thead>
+              <tbody>
+                <% lots.forEach(function (l) { var open = l.status === 'open'; var r = resultFor(l); %>
+                  <tr class="<%= rowClass(l) %>" data-lot="<%= l.id %>" data-lot-no="<%= l.lot_no %>" data-unit="<%= l.unit %>" data-status="<%= l.status %>" data-ends="<%= l.endsAt %>">
+                    <td class="cell-main">
+                      <div class="lot-head">
+                        <% if (l.image_id) { %><a href="/files/lot/<%= l.id %>/image" target="_blank" rel="noopener"><img class="lot-thumb" src="/files/lot/<%= l.id %>/image" alt="Photo of lot <%= l.lot_no %>" loading="lazy" width="64" height="48"></a><% } %>
+                        <div>
+                          <span class="lot-no">Lot <%= l.lot_no %></span>
+                          <div class="lot-title"><%= l.title %></div>
+                          <div class="lot-qty"><%= fmtNum(l.quantity) %> <%= l.unit %></div>
+                          <% if (l.description) { %><div class="lot-desc"><%= l.description %></div><% } %>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="num" data-label="Start price"><div><%= fmtINR(l.start_price) %><span class="sub">per <%= l.unit %></span></div></td>
+                    <td class="num js-high" data-label="Highest bid"><div>
+                      <% if (l.highest !== null && l.highest !== undefined) { %><span class="price"><%= fmtINR(l.highest) %></span>
+                      <% } else if (l.bids > 0) { %><span class="muted">Hidden</span>
+                      <% } else { %><span class="muted">No bids yet</span><% } %>
+                      <span class="sub"><%= plural(l.bids, 'bid') %></span>
+                    </div></td>
+                    <td class="js-close" data-label="<%= live ? 'Closes in' : 'Closes' %>"><div>
+                      <% if (open && live) { %>
+                        <span class="countdown" data-countdown="<%= l.endsAt %>" data-done="Closing"></span>
+                        <span class="sub">at <%= fmtTime(new Date(l.endsAt)) %></span>
+                      <% } else if (open) { %>
+                        <span class="nowrap"><%= fmtTime(new Date(l.endsAt)) %></span><span class="sub"><%= fmtDate(new Date(l.endsAt)) %></span>
+                      <% } else { %>
+                        <span>Closed</span><span class="sub"><%= fmtDT(new Date(l.endsAt)) %></span>
+                      <% } %>
+                    </div></td>
+                    <td class="cell-bid">
+                      <div class="js-standing standing <%= !l.myBid ? '' : !open ? 'done' : l.leading ? 'lead' : 'out' %>"><%
+                        if (user && l.myBid) {
+                          if (!open) { %>Your highest bid <%= fmtINR(l.myBid) %><% }
+                          else if (l.leading) { %>Leading with <%= fmtINR(l.myBid) %><% }
+                          else { %>Outbid. Your bid <%= fmtINR(l.myBid) %><% }
+                        } %></div>
+                      <div class="js-action">
+                        <% if (!open) { %>
+                          <span class="tag <%= r[1] %>"><%= r[0] %></span>
+                        <% } else if (upcoming) { %>
+                          <span class="muted small">Bidding opens <%= fmtTime(a.starts_at) %>, <%= fmtDate(a.starts_at) %></span>
+                        <% } else if (canBid) { %>
+                          <form class="bid-form" method="post" action="/lots/<%= l.id %>/bid" data-lot="<%= l.id %>">
+                            <input type="hidden" name="_csrf" value="<%= csrf %>">
+                            <label class="sr" for="bid-<%= l.id %>">Bid for lot <%= l.lot_no %>, rupees per <%= l.unit %></label>
+                            <input type="number" id="bid-<%= l.id %>" name="amount" inputmode="decimal" step="any" min="0" value="<%= l.minBid %>" autocomplete="off">
+                            <button class="btn btn-accent" type="submit">Place bid</button>
+                          </form>
+                          <div class="bid-confirm hide" role="group" aria-label="Confirm your bid"></div>
+                          <div class="bid-msg" aria-live="polite" data-min="<%= l.minBid %>">Minimum <%= fmtINR(l.minBid) %> per <%= l.unit %></div>
+                        <% } else if (user) { %>
+                          <a class="small" href="/account">Complete your registration to bid</a>
+                        <% } else { %>
+                          <a class="small" href="<%= loginHref %>">Sign in to bid</a>
+                        <% } %>
+                      </div>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+          <p class="muted small table-note">Prices are per unit, excluding GST and other charges listed in the terms. <% if (!a.show_highest_bid) { %>In this auction the highest bid is hidden; you see only whether you are leading.<% } %></p>
+        <% } %>
+      <% } %>
+    </div>
+
+    <aside class="room-side">
+      <% if (!user) { %>
+        <div class="panel">
+          <div class="panel-head"><h3>Bid in this auction</h3></div>
+          <div class="panel-body">
+            <p>You need a verified bidder account to bid. Registration takes a few minutes; document checks usually take one working day.</p>
+            <div class="form-actions">
+              <% if (S.registration_open === '1') { %><a class="btn btn-accent" href="/register">Register to bid</a><% } %>
+              <a class="btn btn-quiet" href="<%= loginHref %>">Sign in to bid</a>
+            </div>
+          </div>
+        </div>
+      <% } else if (eligibility && !eligibility.ok && phase !== 'closed') { %>
+        <div class="panel">
+          <div class="panel-head"><h3>Before you can bid</h3></div>
+          <div class="panel-body"><%- include('../account/_steps') %></div>
+        </div>
+      <% } %>
+
+      <div class="panel">
+        <div class="panel-head"><h3>Schedule</h3><span class="muted small">IST</span></div>
+        <div class="panel-body">
+          <dl class="kv">
+            <dt>Starts</dt><dd><%= fmtDT(a.starts_at) %></dd>
+            <dt><%= a.stagger_min > 0 ? 'First lot closes' : 'Ends' %></dt><dd><%= fmtDT(a.ends_at) %></dd>
+            <% if (a.stagger_min > 0) { %>
+              <dt>Lot closing</dt><dd>Lots close one after another, <%= plural(a.stagger_min, 'minute') %> apart, in lot number order</dd>
+            <% } %>
+            <dt>Extension</dt><dd><% if (a.extend_by_min > 0 && a.extend_window_min > 0) { %>A bid in the last <%= plural(a.extend_window_min, 'minute') %> extends that lot by <%= plural(a.extend_by_min, 'minute') %><% } else { %>Lots close on time, with no extension<% } %></dd>
+            <dt>Highest bid</dt><dd><%= a.show_highest_bid ? 'Shown to all bidders' : 'Hidden from other bidders' %></dd>
+            <% if (a.location) { %><dt>Location</dt><dd><%= a.location %></dd><% } %>
+          </dl>
+        </div>
+      </div>
+
+      <% if (a.inspection) { %>
+        <div class="panel"><div class="panel-head"><h3>Inspection</h3></div><div class="panel-body text-block"><%- nl2p(a.inspection) %></div></div>
+      <% } %>
+      <% if (a.description) { %>
+        <div class="panel"><div class="panel-head"><h3>About this auction</h3></div><div class="panel-body text-block"><%- nl2p(a.description) %></div></div>
+      <% } %>
+      <% if (a.terms) { %>
+        <div class="panel"><div class="panel-head"><h3>Terms of sale</h3></div><div class="panel-body text-block"><%- nl2p(a.terms) %></div></div>
+      <% } %>
+    </aside>
+  </div>
+</div>

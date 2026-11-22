@@ -1,0 +1,35 @@
+<div class="wrap">
+  <div class="page-head">
+    <h1>Payments</h1>
+    <p>Registration fee payments made from this account. Receipts were emailed at the time of payment.</p>
+  </div>
+  <%- include('_nav') %>
+  <% if (!rows.length) { %>
+    <div class="table-wrap"><div class="empty"><h3>No payments yet</h3><p><% if (S.fee_enabled === '1') { %>Pay the registration fee from the <a href="/account/fee">registration fee</a> page.<% } else { %>No registration fee is required at the moment.<% } %></p></div></div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="table table-stack">
+        <thead><tr><th>Date</th><th>For</th><th class="num">Fee</th><th class="num">GST</th><th class="num">Total</th><th>Paid by</th><th>Reference</th><th>Status</th></tr></thead>
+        <tbody>
+          <% rows.forEach(function (p) { %>
+            <tr>
+              <td class="cell-main"><span class="primary"><%= fmtDate(p.paid_at || p.created_at) %></span></td>
+              <td data-label="For"><%= p.purpose === 'registration_fee' ? 'Registration fee' : p.purpose %></td>
+              <td class="num" data-label="Fee"><%= fmtINR(p.base_amount) %></td>
+              <td class="num" data-label="GST"><%= fmtINR(p.tax_amount) %></td>
+              <td class="num" data-label="Total"><b><%= fmtINR(p.amount) %></b></td>
+              <td data-label="Paid by"><%= p.method === 'offline' ? 'Bank transfer or cheque' : 'Online' %></td>
+              <td data-label="Reference"><span class="code"><%= p.rp_payment_id || (p.method === 'offline' ? 'OFFLINE-' + p.id : p.rp_order_id) %></span></td>
+              <td data-label="Status">
+                <% if (p.status === 'paid') { %><span class="tag tag-ok">Paid</span>
+                <% } else if (p.status === 'refunded') { %><span class="tag">Refunded</span>
+                <% } else if (p.status === 'failed') { %><span class="tag tag-bad">Failed</span>
+                <% } else { %><span class="tag">Not completed</span><% } %>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>

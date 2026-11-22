@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title><%= title ? title + ' | Admin' : 'Admin' %></title>
+  <meta name="csrf-token" content="<%= csrf %>">
+  <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/app.css">
+</head>
+<body>
+<%
+  var nav = locals.adminNav || {};
+  function cur(prefix, exact) { var p = '/admin' + (prefix === '/' ? '' : prefix); return (exact ? (path === p || path === p + '/') : path.startsWith(p)) ? 'aria-current="page"' : ''; }
+%>
+<div class="admin">
+  <aside class="admin-side">
+    <a class="brand" href="/admin"><%= S.site_name %></a>
+    <nav aria-label="Admin">
+      <a href="/admin" <%- cur('/', true) %>>Dashboard</a>
+      <div class="group">Auctions</div>
+      <a href="/admin/auctions" <%- cur('/auctions') %>>Auctions and lots</a>
+      <a href="/admin/sellers" <%- cur('/sellers') %>>Sellers</a>
+      <a href="/admin/results" <%- cur('/results') %>>Results <% if (nav.pendingResults) { %><span class="count"><%= nav.pendingResults %></span><% } %></a>
+      <div class="group">Bidders</div>
+      <a href="/admin/bidders" <%- cur('/bidders') %>>Bidders <% if (nav.pendingKyc) { %><span class="count"><%= nav.pendingKyc %></span><% } %></a>
+      <a href="/admin/payments" <%- cur('/payments') %>>Payments</a>
+      <div class="group">Communication</div>
+      <a href="/admin/emails/templates" <%- cur('/emails/templates') %>>Email templates</a>
+      <a href="/admin/emails/broadcast" <%- cur('/emails/broadcast') %>>Send a broadcast</a>
+      <a href="/admin/emails/log" <%- cur('/emails/log') %>>Email log</a>
+      <a href="/admin/enquiries" <%- cur('/enquiries') %>>Enquiries <% if (nav.openEnquiries) { %><span class="count"><%= nav.openEnquiries %></span><% } %></a>
+      <div class="group">Site</div>
+      <a href="/admin/pages" <%- cur('/pages') %>>Pages</a>
+      <a href="/admin/settings" <%- cur('/settings') %>>Settings</a>
+      <a href="/admin/team" <%- cur('/team') %>>Admin users</a>
+      <a href="/admin/audit" <%- cur('/audit') %>>Activity log</a>
+    </nav>
+  </aside>
+  <div class="admin-main">
+    <div class="admin-top">
+      <a href="/" target="_blank" rel="noopener">View public site</a>
+      <div class="row">
+        <span class="muted"><%= admin ? admin.name : '' %></span>
+        <form method="post" action="/admin/logout" class="inline-form"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-quiet btn-sm" type="submit">Sign out</button></form>
+      </div>
+    </div>
+    <div class="admin-content">
+      <%- include('../partials/flash') %>
+      <%- body %>
+    </div>
+  </div>
+</div>
+<script src="/js/site.js"></script>
+<% (locals.scripts || []).forEach(function (s) { %><script src="<%= s %>"></script><% }) %>
+</body>
+</html>

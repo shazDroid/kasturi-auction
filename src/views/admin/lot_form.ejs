@@ -1,0 +1,96 @@
+<div class="page-head">
+  <div>
+    <h1><%= lot ? 'Edit lot ' + lot.lot_no : 'Add lot' %></h1>
+    <p><a href="/admin/auctions/<%= auction.id %>"><%= auction.title %></a></p>
+  </div>
+</div>
+
+<% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. The lot was not saved. If you chose a photo, choose it again.</div><% } %>
+
+<form method="post" enctype="multipart/form-data" novalidate
+      action="<%= lot ? '/admin/lots/' + lot.id : '/admin/auctions/' + auction.id + '/lots' %>?_csrf=<%= csrf %>">
+  <div class="panel">
+    <div class="panel-body">
+      <div class="form-grid three">
+        <div class="field">
+          <label for="lot_no">Lot number</label>
+          <input type="number" id="lot_no" name="lot_no" value="<%= v.lot_no %>" min="1" max="9999" step="1" required>
+          <%- include('_err', { k: 'lot_no' }) %>
+        </div>
+        <div class="field">
+          <label for="quantity">Quantity</label>
+          <input type="text" id="quantity" name="quantity" value="<%= v.quantity === null || Number.isNaN(v.quantity) ? '' : v.quantity %>" inputmode="decimal" required placeholder="For example 24.5">
+          <%- include('_err', { k: 'quantity' }) %>
+        </div>
+        <div class="field">
+          <label for="unit">Unit</label>
+          <select id="unit" name="unit">
+            <% UNITS.forEach(function (u) { %><option value="<%= u %>" <%= v.unit === u ? 'selected' : '' %>><%= u %></option><% }) %>
+          </select>
+          <%- include('_err', { k: 'unit' }) %>
+        </div>
+        <div class="field full">
+          <label for="title">Material</label>
+          <input type="text" id="title" name="title" value="<%= v.title %>" maxlength="200" required placeholder="For example HMS 1 and 2 melting scrap">
+          <%- include('_err', { k: 'title' }) %>
+        </div>
+        <div class="field full">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" rows="4" placeholder="Grade, condition, packing, lifting terms specific to this lot"><%= v.description %></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Price</h3><span class="muted small">Rupees per unit, for example per MT. Total value is the bid times the quantity.</span></div>
+    <div class="panel-body">
+      <% if (pricesLocked) { %>
+        <div class="notice notice-warn">This lot has bids, so the opening price and minimum raise are fixed. The reserve price can still be changed.</div>
+      <% } %>
+      <div class="form-grid three">
+        <div class="field">
+          <label for="start_price">Opening price (₹)</label>
+          <input type="text" id="start_price" name="start_price" value="<%= Number.isNaN(v.start_price) ? '' : v.start_price %>" inputmode="decimal" <%= pricesLocked ? 'readonly' : 'required' %>>
+          <%- include('_err', { k: 'start_price' }) %>
+        </div>
+        <div class="field">
+          <label for="increment">Minimum raise (₹)</label>
+          <input type="text" id="increment" name="increment" value="<%= Number.isNaN(v.increment) ? '' : v.increment %>" inputmode="decimal" <%= pricesLocked ? 'readonly' : 'required' %>>
+          <%- include('_err', { k: 'increment' }) %>
+          <div class="hint">Each bid must beat the highest bid by at least this much.</div>
+        </div>
+        <div class="field">
+          <label for="reserve_price">Reserve price (₹, optional)</label>
+          <input type="text" id="reserve_price" name="reserve_price" value="<%= v.reserve_price === null || Number.isNaN(v.reserve_price) ? '' : v.reserve_price %>" inputmode="decimal">
+          <%- include('_err', { k: 'reserve_price' }) %>
+          <div class="hint">Never shown to bidders. Leave empty for no reserve.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Photo</h3></div>
+    <div class="panel-body">
+      <% if (lot && v.image_id) { %>
+        <div class="row field">
+          <img class="lot-thumb lot-thumb-lg" src="/admin/files/<%= v.image_id %>" alt="Current photo of lot <%= lot.lot_no %>">
+          <div class="check"><input type="checkbox" id="remove_image" name="remove_image" value="1"><label for="remove_image">Remove this photo</label></div>
+        </div>
+      <% } %>
+      <div class="field">
+        <label for="image"><%= lot && v.image_id ? 'Replace photo' : 'Photo (optional)' %></label>
+        <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp">
+        <%- include('_err', { k: 'image' }) %>
+        <div class="hint">JPG, PNG or WebP, up to 5 MB.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions mt">
+    <button class="btn" type="submit">Save lot</button>
+    <% if (!lot) { %><button class="btn btn-quiet" type="submit" name="and_next" value="1">Save and add another</button><% } %>
+    <a class="btn btn-quiet" href="/admin/auctions/<%= auction.id %>">Cancel</a>
+  </div>
+</form>

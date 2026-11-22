@@ -1,0 +1,29 @@
+<%# Eligibility checklist. Expects `eligibility` (from res.locals) and `user`. %>
+<ol class="steps">
+  <% eligibility.steps.forEach(function (s) { %>
+    <li class="<%= s.done ? 'done' : '' %>">
+      <span class="mark" aria-hidden="true"></span>
+      <span class="grow"><%= s.label %><span class="sr"><%= s.done ? ' (done)' : ' (to do)' %></span>
+        <% if (s.key === 'email' && !s.done) { %><span class="sub muted small">Open the link we sent to <%= user.email %>.</span><% } %>
+      </span>
+      <% if (!s.done) { %>
+        <% if (s.key === 'email') { %>
+          <form method="post" action="/account/resend-verification" class="inline-form">
+            <input type="hidden" name="_csrf" value="<%= csrf %>">
+            <button class="btn btn-quiet btn-sm" type="submit">Resend verification email</button>
+          </form>
+        <% } else if (s.key === 'kyc' && user.kyc_status === 'pending') { %>
+          <span class="tag tag-warn">Under review</span>
+        <% } else if (s.key === 'kyc') { %>
+          <a class="btn btn-quiet btn-sm" href="<%= s.href %>"><%= user.kyc_status === 'rejected' ? 'Fix and resubmit' : 'Upload documents' %></a>
+        <% } else if (s.key === 'fee') { %>
+          <a class="btn btn-quiet btn-sm" href="<%= s.href %>">Pay fee</a>
+        <% } else { %>
+          <a class="btn btn-quiet btn-sm" href="<%= s.href %>">Continue</a>
+        <% } %>
+      <% } else { %>
+        <span class="muted small">Done</span>
+      <% } %>
+    </li>
+  <% }) %>
+</ol>

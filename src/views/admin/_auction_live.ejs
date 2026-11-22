@@ -1,0 +1,67 @@
+<div data-now="<%= serverNow %>" data-phase="<%= a.phase %>"></div>
+<section class="admin-section">
+  <div class="row-between">
+    <h2>Lots</h2>
+    <% if (a.phase === 'live') { %><span class="muted small">Updates every 5 seconds</span><% } %>
+  </div>
+  <div class="table-wrap">
+  <% if (!lots.length) { %>
+    <div class="empty"><h3>No lots in this auction</h3><p><% if (!a.window_over) { %><a href="/admin/auctions/<%= a.id %>/lots/new">Add the first lot</a> with its quantity and opening price.<% } else { %>The bidding window has ended.<% } %></p></div>
+  <% } else { %>
+    <table class="table table-stack lots-admin">
+      <thead><tr>
+        <th>Lot</th><th></th><th>Material</th><th class="num">Quantity</th><th class="num">Opening</th><th class="num">Raise</th><th class="num">Reserve</th>
+        <th class="num">Bids</th><th class="num">Highest bid</th><th>Closes</th><th>Result</th><th></th>
+      </tr></thead>
+      <tbody>
+      <% lots.forEach(function (l) { var met = l.reserve_price === null || (l.top_amount !== null && l.top_amount >= l.reserve_price); %>
+        <tr>
+          <td data-label="Lot" class="nowrap"><b><%= l.lot_no %></b></td>
+          <td data-label="Photo"><% if (l.image_id) { %><img class="lot-thumb" src="/admin/files/<%= l.image_id %>" alt=""><% } %></td>
+          <td class="cell-main"><a class="primary" href="/admin/lots/<%= l.id %>"><%= l.title %></a><% if (l.description) { %><span class="sub clip"><%= l.description %></span><% } %></td>
+          <td class="num" data-label="Quantity"><%= fmtNum(l.quantity) %> <%= l.unit %></td>
+          <td class="num" data-label="Opening"><%= fmtINR(l.start_price) %></td>
+          <td class="num" data-label="Raise"><%= fmtINR(l.increment) %></td>
+          <td class="num" data-label="Reserve"><%= l.reserve_price === null ? 'None' : fmtINR(l.reserve_price) %></td>
+          <td class="num" data-label="Bids"><%= l.bid_count %></td>
+          <td class="num" data-label="Highest bid">
+            <% if (l.top_amount !== null) { %>
+              <b><%= fmtINR(l.top_amount) %></b>
+              <span class="sub"><a href="/admin/bidders/<%= l.top_user %>"><%= l.top_name %></a></span>
+              <% if (l.reserve_price !== null) { %><span class="sub <%= met ? 'good' : 'bad' %>"><%= met ? 'Reserve met' : 'Below reserve' %></span><% } %>
+            <% } else { %><span class="muted">None</span><% } %>
+          </td>
+          <td data-label="Closes" class="nowrap">
+            <% if (l.status === 'open' && a.phase === 'live') { %><span class="countdown" data-countdown="<%= new Date(l.ends_at).getTime() %>" data-done="Closing"></span><span class="sub"><%= fmtTimeS(l.ends_at) %></span>
+            <% } else { %><%= fmtDT(l.ends_at) %><% } %>
+          </td>
+          <td data-label="Result"><%- l.status === 'open' ? (a.phase === 'live' ? tag('result', 'open') : '<span class="muted">Not started</span>') : tag('result', l.result || 'closed') %></td>
+          <td class="actions">
+            <a href="/admin/lots/<%= l.id %>/edit">Edit</a>
+            <% if (l.status === 'open' && a.phase === 'live') { %>
+              <form method="post" action="/admin/lots/<%= l.id %>/close-now" class="inline-form"><%- include('_csrf') %><input type="hidden" name="back" value="/admin/auctions/<%= a.id %>">
+                <button class="linkbtn danger" type="submit" data-confirm="Close lot <%= l.lot_no %> now? Bidding on it stops within 2 seconds and it cannot be reopened.">Close now</button>
+              </form>
+            <% } %>
+            <% if (!l.bid_count && l.status === 'open') { %>
+              <form method="post" action="/admin/lots/<%= l.id %>/delete" class="inline-form"><%- include('_csrf') %>
+                <button class="linkbtn danger" type="submit" data-confirm="Delete lot <%= l.lot_no %>?">Delete</button>
+              </form>
+            <% } %>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+  </div>
+</section>
+
+<section class="admin-section">
+  <div class="row-between">
+    <h2>Bid history</h2>
+    <% if (bids.length) { %><span class="row"><a href="/admin/auctions/<%= a.id %>/bids">All bids</a><a href="/admin/auctions/<%= a.id %>/bids.csv">Download CSV</a></span><% } %>
+  </div>
+  <%- include('_bids_table', { bids: bids, showLot: true, emptyText: a.phase === 'upcoming' || a.phase === 'draft' ? 'Bids appear here once bidding opens on ' + fmtDT(a.starts_at) + '.' : 'Nobody has bid in this auction.' }) %>
+  <% if (bids.length >= 50) { %><p class="muted small mt">Showing the latest 50 bids. <a href="/admin/auctions/<%= a.id %>/bids">See all bids</a>.</p><% } %>
+</section>

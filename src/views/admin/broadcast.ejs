@@ -1,0 +1,70 @@
+<div class="page-head">
+  <div>
+    <h1>Send a broadcast</h1>
+    <p>One email to a group of bidders, for example a schedule change or a new auction series. Blocked bidders and those who turned off auction emails are left out.</p>
+  </div>
+</div>
+<%- include('_transport') %>
+<% if (error) { %><div class="notice notice-error" role="alert"><%= error %></div><% } %>
+
+<div class="cols">
+  <div>
+    <form method="get" action="/admin/emails/broadcast" class="panel">
+      <div class="panel-head"><h3>1. Choose who receives it</h3></div>
+      <div class="panel-body">
+        <div class="form-grid">
+          <div class="field">
+            <label for="audience">Audience</label>
+            <select id="audience" name="audience" data-show-when="auction:#auction-field">
+              <option value="">Choose an audience</option>
+              <% Object.keys(AUDIENCES).forEach(function (k) { %><option value="<%= k %>" <%= v.audience === k ? 'selected' : '' %>><%= AUDIENCES[k] %></option><% }) %>
+            </select>
+          </div>
+          <div class="field <%= v.audience === 'auction' ? '' : 'hide' %>" id="auction-field">
+            <label for="auction_id">Auction</label>
+            <select id="auction_id" name="auction_id">
+              <option value="">Choose an auction</option>
+              <% auctions.forEach(function (a) { %><option value="<%= a.id %>" <%= v.auction_id === a.id ? 'selected' : '' %>><%= a.title %> (<%= fmtDate(a.starts_at) %>)</option><% }) %>
+            </select>
+          </div>
+        </div>
+        <div class="row">
+          <button class="btn btn-quiet btn-sm" type="submit">Count recipients</button>
+          <% if (count !== null) { %><span><b><%= fmtNum(count) %></b> bidder<%= count === 1 ? '' : 's' %> will receive this email.</span><% } %>
+        </div>
+      </div>
+    </form>
+
+    <form method="post" action="/admin/emails/broadcast" class="panel" novalidate>
+      <div class="panel-head"><h3>2. Write the message</h3></div>
+      <div class="panel-body">
+        <%- include('_csrf') %>
+        <input type="hidden" name="audience" value="<%= v.audience %>">
+        <input type="hidden" name="auction_id" value="<%= v.auction_id || '' %>">
+        <% if (!v.audience) { %><p class="muted">Choose and count the audience first.</p><% } %>
+        <div class="field">
+          <label for="subject">Subject</label>
+          <input type="text" id="subject" name="subject" value="<%= v.subject %>" maxlength="200" required>
+        </div>
+        <div class="field">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" rows="10" required placeholder="Dear {{name}},&#10;&#10;"><%= v.message %></textarea>
+          <div class="hint">Plain text. Leave a blank line between paragraphs. <span class="code">{{name}}</span> is replaced with each bidder's name.</div>
+        </div>
+        <div class="check">
+          <input type="checkbox" id="confirm" name="confirm" value="1">
+          <label for="confirm">I have checked the message and want to send it to <%= count !== null ? fmtNum(count) + ' bidder' + (count === 1 ? '' : 's') : 'the chosen audience' %>.</label>
+        </div>
+        <button class="btn" type="submit" <%= v.audience ? '' : 'disabled' %>>Send broadcast</button>
+      </div>
+    </form>
+  </div>
+  <div class="panel">
+    <div class="panel-head"><h3>Good to know</h3></div>
+    <div class="panel-body small">
+      <p>Emails are queued and sent a few at a time. Large lists take a few minutes.</p>
+      <p>Each send is listed in the <a href="/admin/emails/log?template=broadcast">email log</a>, where failed emails can be sent again.</p>
+      <p>To announce a single auction with its dates and lot count, use "Email announcement to bidders" on the auction page instead.</p>
+    </div>
+  </div>
+</div>

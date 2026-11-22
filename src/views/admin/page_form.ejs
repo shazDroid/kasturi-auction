@@ -1,0 +1,27 @@
+<div class="page-head">
+  <div>
+    <h1>Edit page</h1>
+    <p><%= p.title %>, shown at <a href="/<%= p.slug %>" target="_blank" rel="noopener">/<%= p.slug %></a>. Last edited <%= fmtDT(p.updated_at) %>.</p>
+  </div>
+  <a class="btn btn-quiet" href="/<%= p.slug %>" target="_blank" rel="noopener">View on site</a>
+</div>
+
+<form method="post" action="/admin/pages/<%= encodeURIComponent(p.slug) %>" class="panel" novalidate>
+  <div class="panel-body">
+    <%- include('_csrf') %>
+    <div class="field mid">
+      <label for="title">Page title</label>
+      <input type="text" id="title" name="title" value="<%= v.title %>" maxlength="200" required>
+      <%- include('_err', { k: 'title' }) %>
+    </div>
+    <div class="field">
+      <label for="body">Page content (HTML)</label>
+      <textarea id="body" name="body" class="code-area code-area-tall" spellcheck="false"><%= v.body %></textarea>
+      <div class="hint">Use simple tags: &lt;h2&gt; and &lt;h3&gt; for headings, &lt;p&gt; for paragraphs, &lt;ul&gt;/&lt;ol&gt; with &lt;li&gt; for lists, &lt;b&gt;, &lt;a href=""&gt; and &lt;br&gt;. The page title is shown above the content, so do not repeat it as a heading. The content is published exactly as written.</div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">Save page</button>
+      <a class="btn btn-quiet" href="/admin/pages">Back to pages</a>
+    </div>
+  </div>
+</form>

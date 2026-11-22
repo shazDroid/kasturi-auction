@@ -1,0 +1,129 @@
+<div class="page-head">
+  <div>
+    <h1><%= auction ? 'Edit auction' : 'New auction' %></h1>
+    <p><%= auction ? auction.title : 'Set the details and the bidding window. You add lots on the next screen.' %></p>
+  </div>
+</div>
+
+<% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. The auction was not saved.</div><% } %>
+
+<form method="post" action="<%= auction ? '/admin/auctions/' + auction.id : '/admin/auctions' %>" novalidate>
+  <%- include('_csrf') %>
+  <div class="panel">
+    <div class="panel-head"><h3>What is being sold</h3></div>
+    <div class="panel-body">
+      <div class="form-grid">
+        <div class="field full">
+          <label for="title">Auction title</label>
+          <input type="text" id="title" name="title" value="<%= v.title %>" maxlength="200" required>
+          <%- include('_err', { k: 'title' }) %>
+        </div>
+        <div class="field">
+          <label for="seller_id">Seller</label>
+          <select id="seller_id" name="seller_id">
+            <option value="">No seller shown</option>
+            <% sellers.forEach(function (s) { %><option value="<%= s.id %>" <%= Number(v.seller_id) === s.id ? 'selected' : '' %>><%= s.name %><%= s.active ? '' : ' (inactive)' %></option><% }) %>
+          </select>
+          <%- include('_err', { k: 'seller_id' }) %>
+          <div class="hint"><a href="/admin/sellers/new">Add a seller</a> if it is not in the list.</div>
+        </div>
+        <div class="field">
+          <label for="category">Category</label>
+          <input type="text" id="category" name="category" value="<%= v.category %>" list="categories" maxlength="100" placeholder="For example Ferrous scrap">
+          <datalist id="categories"><% categories.forEach(function (c) { %><option value="<%= c %>"><% }) %></datalist>
+        </div>
+        <div class="field full">
+          <label for="location">Material location</label>
+          <input type="text" id="location" name="location" value="<%= v.location %>" maxlength="200" placeholder="Plant or yard address, city and state">
+        </div>
+        <div class="field full">
+          <label for="description">Description</label>
+          <textarea id="description" name="description" rows="5"><%= v.description %></textarea>
+          <div class="hint">Shown on the auction page. Plain text; blank lines start a new paragraph.</div>
+        </div>
+        <div class="field full">
+          <label for="inspection">Inspection details</label>
+          <textarea id="inspection" name="inspection" rows="3" placeholder="Dates, timings, contact person and what to bring"><%= v.inspection %></textarea>
+        </div>
+        <div class="field full">
+          <label for="terms">Terms and conditions for this auction</label>
+          <textarea id="terms" name="terms" rows="5" placeholder="Payment terms, EMD, lifting period, GST and TCS, weighment"><%= v.terms %></textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Bidding window</h3></div>
+    <div class="panel-body">
+      <% if (locked) { %>
+        <div class="notice notice-warn">Bidding has started, so the start and closing times cannot be changed here. To give bidders more time, use "Extend closing time" on the auction page.</div>
+        <dl class="kv">
+          <dt>Started</dt><dd><%= fmtDT(auction.starts_at) %> IST</dd>
+          <dt>Scheduled close</dt><dd><%= fmtDT(auction.ends_at) %> IST</dd>
+        </dl>
+      <% } else { %>
+      <div class="form-grid three">
+        <div class="field">
+          <label for="starts_at">Bidding opens (IST)</label>
+          <input type="datetime-local" id="starts_at" name="starts_at" value="<%= toLocalInput(v.starts_at) %>" required>
+          <%- include('_err', { k: 'starts_at' }) %>
+        </div>
+        <div class="field">
+          <label for="ends_at">First lot closes (IST)</label>
+          <input type="datetime-local" id="ends_at" name="ends_at" value="<%= toLocalInput(v.ends_at) %>" required>
+          <%- include('_err', { k: 'ends_at' }) %>
+        </div>
+        <div class="field">
+          <label for="stagger_min">Gap between lot closings (minutes)</label>
+          <input type="number" id="stagger_min" name="stagger_min" value="<%= v.stagger_min %>" min="0" max="240" step="1">
+          <%- include('_err', { k: 'stagger_min' }) %>
+          <div class="hint">0 closes all lots together. 5 closes lot 2 five minutes after lot 1, and so on.</div>
+        </div>
+      </div>
+      <% } %>
+      <div class="form-grid three">
+        <div class="field">
+          <label for="extend_window_min">Auto-extend window (minutes)</label>
+          <input type="number" id="extend_window_min" name="extend_window_min" value="<%= v.extend_window_min %>" min="0" max="120" step="1">
+          <%- include('_err', { k: 'extend_window_min' }) %>
+          <div class="hint">A bid this close to a lot's closing time extends that lot.</div>
+        </div>
+        <div class="field">
+          <label for="extend_by_min">Extend by (minutes)</label>
+          <input type="number" id="extend_by_min" name="extend_by_min" value="<%= v.extend_by_min %>" min="0" max="120" step="1">
+          <%- include('_err', { k: 'extend_by_min' }) %>
+          <div class="hint">0 turns auto-extension off for this auction.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Rules and visibility</h3></div>
+    <div class="panel-body">
+      <div class="check">
+        <input type="checkbox" id="show_highest_bid" name="show_highest_bid" value="1" <%= v.show_highest_bid ? 'checked' : '' %>>
+        <div><label for="show_highest_bid">Show the highest bid to bidders</label><div class="hint">When off, bidders only see whether they are leading (sealed-style bidding).</div></div>
+      </div>
+      <div class="check">
+        <input type="checkbox" id="auto_award" name="auto_award" value="1" <%= v.auto_award ? 'checked' : '' %>>
+        <div><label for="auto_award">Award automatically when the reserve price is met</label><div class="hint">The winner is emailed as soon as the lot closes. Lots below reserve still wait for a decision.</div></div>
+      </div>
+      <div class="field field-narrow">
+        <label for="status">Status</label>
+        <select id="status" name="status">
+          <option value="draft" <%= v.status === 'draft' ? 'selected' : '' %>>Draft (hidden from bidders)</option>
+          <option value="published" <%= v.status === 'published' ? 'selected' : '' %>>Published</option>
+          <% if (auction) { %><option value="cancelled" <%= v.status === 'cancelled' ? 'selected' : '' %>>Cancelled</option><% } %>
+        </select>
+        <%- include('_err', { k: 'status' }) %>
+      </div>
+    </div>
+  </div>
+
+  <div class="form-actions mt">
+    <button class="btn" type="submit">Save auction</button>
+    <a class="btn btn-quiet" href="<%= auction ? '/admin/auctions/' + auction.id : '/admin/auctions' %>">Cancel</a>
+  </div>
+</form>

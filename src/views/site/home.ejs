@@ -1,0 +1,80 @@
+<section class="hero" data-server-now="<%= Date.now() %>">
+  <div class="wrap">
+    <%- include('../partials/flash') %>
+    <h1><%= S.tagline %></h1>
+    <p>Plants, rail yards and manufacturers list scrap metal, used machinery and surplus stock here, and verified buyers bid on it online, lot by lot, until each lot closes.</p>
+    <div class="row">
+      <% if (user) { %>
+        <a class="btn btn-accent" href="/account">Go to my account</a>
+      <% } else if (S.registration_open === '1') { %>
+        <a class="btn btn-accent" href="/register">Register to bid</a>
+      <% } else { %>
+        <a class="btn btn-accent" href="/login">Sign in to bid</a>
+      <% } %>
+      <a class="btn btn-quiet" href="/auctions">View auction schedule</a>
+    </div>
+    <div class="hero-board">
+      <%- include('_board', { board: board, boardLink: ['/auctions', 'Full schedule'] }) %>
+    </div>
+  </div>
+</section>
+
+<div class="wrap after-hero">
+  <section class="section">
+    <h2>How bidding works</h2>
+    <ol class="seq">
+      <li>
+        <h3>Register your company</h3>
+        <p>Sign up with your company name, mobile number and work email, then confirm the email address from the link we send.</p>
+      </li>
+      <li>
+        <% if (kyc || fee) { %>
+          <h3>Get cleared to bid</h3>
+          <p><% if (kyc) { %>Upload your GST certificate, PAN and address proof for a one-time check<% } %><% if (kyc && fee) { %>, and pay<% } else if (fee) { %>Pay<% } %><% if (fee) { %> the yearly registration fee online<% } %>. You can bid once this is done.</p>
+        <% } else { %>
+          <h3>Complete your business profile</h3>
+          <p>Add your GSTIN or PAN and registered address so sellers can raise invoices in your company's name.</p>
+        <% } %>
+      </li>
+      <li>
+        <h3>Inspect the material and bid</h3>
+        <p>Each auction lists its lots with quantity, starting price per unit and inspection dates at the seller's site. While the auction is live, bid on any lot. A bid in the last few minutes extends that lot, so everyone gets a fair chance to respond.</p>
+      </li>
+      <li>
+        <h3>Get the award and lift the material</h3>
+        <p>When a lot closes, the seller reviews the highest bid and confirms the award. You pay the seller as per the auction terms and collect the material from their yard.</p>
+      </li>
+    </ol>
+    <p class="small"><a href="/how-it-works">Read the full bidding rules</a></p>
+  </section>
+
+  <section class="section">
+    <div class="row-between section-head"><h2>Recently closed</h2><a class="small" href="/auctions?show=closed">All closed auctions</a></div>
+    <% if (!closed.length) { %>
+      <div class="table-wrap"><div class="empty"><p>Closed auctions and their results will be listed here.</p></div></div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="table table-stack">
+          <thead><tr><th>Auction</th><th>Seller</th><th class="num">Lots</th><th>Closed on</th><th><span class="sr">Results</span></th></tr></thead>
+          <tbody>
+            <% closed.forEach(function (a) { %>
+              <tr>
+                <td class="cell-main"><a class="primary" href="/auctions/<%= a.id %>"><%= a.title %></a><% if (a.location) { %><span class="sub"><%= a.location %></span><% } %></td>
+                <td data-label="Seller"><%= a.seller_name || 'Not disclosed' %></td>
+                <td class="num" data-label="Lots"><%= a.lot_count %></td>
+                <td data-label="Closed on"><%= fmtDate(a.closed_at || a.ends_at) %></td>
+                <td class="actions" data-label=""><a href="/auctions/<%= a.id %>">View results</a></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="section sell">
+    <h2>Sell your scrap or surplus through us</h2>
+    <p>If your plant or yard has ferrous or non-ferrous scrap, idle machinery, cable, or surplus stores to dispose of, we run the auction for you: lot listing, bidder verification, the live bidding and a full bid report for your records.</p>
+    <a class="btn btn-quiet" href="/contact">Talk to us about selling</a>
+  </section>
+</div>

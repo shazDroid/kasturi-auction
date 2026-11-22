@@ -1,0 +1,92 @@
+<div class="wrap mid">
+<% if (!open) { %>
+  <div class="page-head">
+    <h1>Registrations are closed</h1>
+    <p>We are not accepting new bidder accounts at the moment.</p>
+  </div>
+  <div class="panel"><div class="panel-body">
+    <p>To register your company as a bidder, contact us and we will set up your account.</p>
+    <dl class="kv">
+      <dt>Email</dt><dd><a href="mailto:<%= S.contact_email %>"><%= S.contact_email %></a></dd>
+      <% if (S.contact_phone) { %><dt>Phone</dt><dd><%= S.contact_phone %></dd><% } %>
+      <% if (S.support_hours) { %><dt>Hours</dt><dd><%= S.support_hours %></dd><% } %>
+    </dl>
+    <div class="form-actions"><a class="btn btn-quiet" href="/contact">Send us a message</a> <a href="/login">I already have an account</a></div>
+  </div></div>
+<% } else { %>
+  <div class="page-head">
+    <h1>Register as a bidder</h1>
+    <p>Create an account for your company. After this you verify your email<% if (S.require_kyc_approval === '1') { %>, upload your business documents<% } %><% if (S.fee_enabled === '1') { %> and pay the registration fee<% } %> before you can bid.</p>
+  </div>
+  <% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Some details need fixing. Check the fields marked below.</div><% } %>
+  <form class="panel" method="post" action="/register" novalidate>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="panel-body">
+      <fieldset>
+        <legend>Your details</legend>
+        <div class="form-grid">
+          <div class="field full">
+            <label for="r-name">Full name</label>
+            <input type="text" id="r-name" name="name" value="<%= values.name %>" autocomplete="name" required maxlength="100" <%- errors.name ? 'aria-invalid="true"' : '' %>>
+            <% if (errors.name) { %><div class="err"><%= errors.name %></div><% } %>
+          </div>
+          <div class="field">
+            <label for="r-email">Work email</label>
+            <input type="email" id="r-email" name="email" value="<%= values.email %>" autocomplete="email" required maxlength="200" <%- errors.email ? 'aria-invalid="true"' : '' %>>
+            <% if (errors.email) { %><div class="err"><%= errors.email %></div><% } else { %><div class="hint">Auction alerts and receipts go here.</div><% } %>
+          </div>
+          <div class="field">
+            <label for="r-phone">Mobile number</label>
+            <input type="tel" id="r-phone" name="phone" value="<%= values.phone %>" autocomplete="tel" required maxlength="20" <%- errors.phone ? 'aria-invalid="true"' : '' %>>
+            <% if (errors.phone) { %><div class="err"><%= errors.phone %></div><% } %>
+          </div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Your business</legend>
+        <div class="form-grid">
+          <div class="field">
+            <label for="r-company">Company or firm name</label>
+            <input type="text" id="r-company" name="company_name" value="<%= values.company_name %>" autocomplete="organization" required maxlength="150" <%- errors.company_name ? 'aria-invalid="true"' : '' %>>
+            <% if (errors.company_name) { %><div class="err"><%= errors.company_name %></div><% } else { %><div class="hint">As it appears on your GST certificate.</div><% } %>
+          </div>
+          <div class="field">
+            <label for="r-type">Business type</label>
+            <select id="r-type" name="business_type" <%- errors.business_type ? 'aria-invalid="true"' : '' %>>
+              <option value="">Choose one</option>
+              <% businessTypes.forEach(function (t) { %><option <%= values.business_type === t ? 'selected' : '' %>><%= t %></option><% }) %>
+            </select>
+            <% if (errors.business_type) { %><div class="err"><%= errors.business_type %></div><% } %>
+          </div>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Password</legend>
+        <div class="form-grid">
+          <div class="field">
+            <label for="r-pass">Password</label>
+            <input type="password" id="r-pass" name="password" autocomplete="new-password" required minlength="8" <%- errors.password ? 'aria-invalid="true"' : '' %>>
+            <% if (errors.password) { %><div class="err"><%= errors.password %></div><% } else { %><div class="hint">At least 8 characters.</div><% } %>
+          </div>
+          <div class="field">
+            <label for="r-confirm">Type the password again</label>
+            <input type="password" id="r-confirm" name="confirm" autocomplete="new-password" required <%- errors.confirm ? 'aria-invalid="true"' : '' %>>
+            <% if (errors.confirm) { %><div class="err"><%= errors.confirm %></div><% } %>
+          </div>
+        </div>
+      </fieldset>
+      <div class="check">
+        <input type="checkbox" id="r-accept" name="accept" value="1" <%= values.accept ? 'checked' : '' %>>
+        <div>
+          <label for="r-accept">I accept the <a href="/terms" target="_blank" rel="noopener">terms and conditions</a> and the <a href="/privacy" target="_blank" rel="noopener">privacy policy</a></label>
+          <% if (errors.accept) { %><div class="err small"><%= errors.accept %></div><% } %>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-accent" type="submit">Create account</button>
+        <span class="muted">Already registered? <a href="/login">Sign in</a></span>
+      </div>
+    </div>
+  </form>
+<% } %>
+</div>

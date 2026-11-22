@@ -1,0 +1,110 @@
+<%
+  function kb(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+%>
+<div class="wrap">
+  <div class="page-head">
+    <h1>Verification</h1>
+    <p>We check every bidder's business documents before they can bid. Upload clear scans or photos; PDF, JPG, PNG or WebP up to 5 MB each.</p>
+  </div>
+  <%- include('_nav') %>
+
+  <% if (!kycRequired) { %>
+    <div class="notice">Document approval is not currently required to bid. You can still upload your documents so your account is ready if this changes.</div>
+  <% } %>
+  <% if (user.kyc_status === 'pending') { %>
+    <div class="notice notice-warn"><p>Submitted for review on <%= fmtDT(user.kyc_submitted_at) %>. We will email you when the documents have been checked, usually within one working day.</p></div>
+  <% } else if (user.kyc_status === 'approved') { %>
+    <div class="notice notice-ok"><p>Your documents are approved. To replace a document or change company details, <a href="/contact">contact support</a>.</p></div>
+  <% } else if (user.kyc_status === 'rejected') { %>
+    <div class="notice notice-error" role="alert">
+      <p><b>Your documents were not approved.</b><% if (user.kyc_note) { %> Reason given: <%= user.kyc_note %><% } %></p>
+      <p>Fix the details or replace the documents below, then submit again.</p>
+    </div>
+  <% } %>
+
+  <div class="cols">
+    <div>
+      <div class="table-wrap">
+        <table class="table table-stack">
+          <thead><tr><th>Document</th><th>Uploaded</th><% if (editable) { %><th>Add a file</th><% } %></tr></thead>
+          <tbody>
+            <% slots.forEach(function (s) { %>
+              <tr>
+                <td class="cell-main">
+                  <span class="primary"><%= s.type %></span>
+                  <span class="sub"><%= s.files.length ? (s.files.length === 1 ? '1 file' : s.files.length + ' files') : 'Required' %></span>
+                </td>
+                <td data-label="Uploaded">
+                  <% if (!s.files.length) { %><span class="muted">Nothing uploaded yet</span><% } %>
+                  <% s.files.forEach(function (f) { %>
+                    <div class="doc-file">
+                      <a href="/account/documents/<%= f.id %>" target="_blank" rel="noopener"><%= f.filename %></a>
+                      <span class="muted small"><%= kb(f.size) %>, <%= fmtDate(f.created_at) %></span>
+                      <% if (editable) { %>
+                        <form method="post" action="/account/verification/remove/<%= f.id %>" class="inline-form">
+                          <input type="hidden" name="_csrf" value="<%= csrf %>">
+                          <button class="linkbtn danger small" type="submit" data-confirm="Remove <%= f.filename %>?">Remove</button>
+                        </form>
+                      <% } %>
+                    </div>
+                  <% }) %>
+                </td>
+                <% if (editable) { %>
+                  <td class="cell-bid">
+                    <form class="upload-form" method="post" enctype="multipart/form-data" action="/account/verification/upload?_csrf=<%= encodeURIComponent(csrf) %>">
+                      <input type="hidden" name="doc_type" value="<%= s.type %>">
+                      <label class="sr" for="up-<%= s.type.replace(/\W+/g, '-') %>">File for <%= s.type %></label>
+                      <input type="file" id="up-<%= s.type.replace(/\W+/g, '-') %>" name="file" accept=".pdf,.jpg,.jpeg,.png,.webp,application/pdf,image/jpeg,image/png,image/webp" required>
+                      <button class="btn btn-quiet btn-sm" type="submit">Upload</button>
+                    </form>
+                  </td>
+                <% } %>
+              </tr>
+            <% }) %>
+            <% if (!slots.length) { %>
+              <tr><td colspan="3"><div class="empty">No documents are needed at the moment.</div></td></tr>
+            <% } %>
+          </tbody>
+        </table>
+      </div>
+      <% if (other.length) { %>
+        <p class="muted small section">Earlier uploads under document types we no longer ask for:
+          <% other.forEach(function (f, i) { %><a href="/account/documents/<%= f.id %>" target="_blank" rel="noopener"><%= f.filename %></a> (<%= f.doc_type %>)<%= i < other.length - 1 ? ', ' : '' %><% }) %>
+        </p>
+      <% } %>
+    </div>
+
+    <div>
+      <div class="panel">
+        <div class="panel-head"><h3>Business profile</h3><% if (missing.length) { %><span class="tag tag-warn">Incomplete</span><% } else { %><span class="tag tag-ok">Complete</span><% } %></div>
+        <div class="panel-body">
+          <% if (missing.length) { %>
+            <p>Add your <%= missing.join(', ') %>.</p>
+            <a class="btn btn-quiet btn-sm" href="/account/profile">Edit business profile</a>
+          <% } else { %>
+            <dl class="kv">
+              <dt>Company</dt><dd><%= user.company_name %></dd>
+              <% if (user.gstin) { %><dt>GSTIN</dt><dd><%= user.gstin %></dd><% } %>
+              <% if (user.pan) { %><dt>PAN</dt><dd><%= user.pan %></dd><% } %>
+              <dt>Address</dt><dd><%= user.address %>, <%= user.city %>, <%= user.state %> <%= user.pincode %></dd>
+            </dl>
+          <% } %>
+        </div>
+      </div>
+      <% if (['incomplete', 'rejected'].includes(user.kyc_status)) { %>
+        <form class="panel" method="post" action="/account/verification/submit">
+          <input type="hidden" name="_csrf" value="<%= csrf %>">
+          <div class="panel-head"><h3>Submit for review</h3></div>
+          <div class="panel-body">
+            <% if (canSubmit) { %>
+              <p>Your profile and documents are ready. Our team checks them, usually within one working day.</p>
+            <% } else { %>
+              <p class="muted">You can submit once the business profile is complete<% if (!docsComplete) { %> and every document above has at least one file<% } %>.</p>
+            <% } %>
+            <button class="btn btn-block" type="submit" <%= canSubmit ? '' : 'disabled' %>>Submit for review</button>
+          </div>
+        </form>
+      <% } %>
+    </div>
+  </div>
+</div>

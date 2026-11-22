@@ -1,0 +1,80 @@
+<div class="page-head">
+  <div>
+    <h1>Edit bidder details</h1>
+    <p><a href="/admin/bidders/<%= u.id %>"><%= u.name %></a>, <%= bidderNo(u.id) %>. Changes take effect at once. Changing the email address marks it as not verified.</p>
+  </div>
+</div>
+
+<% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. Nothing was saved.</div><% } %>
+
+<form method="post" action="/admin/bidders/<%= u.id %>/edit" class="panel mid" novalidate>
+  <div class="panel-body">
+    <%- include('_csrf') %>
+    <div class="form-grid">
+      <div class="field">
+        <label for="name">Contact person</label>
+        <input type="text" id="name" name="name" value="<%= v.name %>" maxlength="200" required>
+        <%- include('_err', { k: 'name' }) %>
+      </div>
+      <div class="field">
+        <label for="phone">Phone</label>
+        <input type="tel" id="phone" name="phone" value="<%= v.phone %>" maxlength="50">
+      </div>
+      <div class="field full">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" value="<%= v.email %>" maxlength="200" required>
+        <%- include('_err', { k: 'email' }) %>
+      </div>
+      <div class="field">
+        <label for="company_name">Company</label>
+        <input type="text" id="company_name" name="company_name" value="<%= v.company_name %>" maxlength="200">
+      </div>
+      <div class="field">
+        <label for="business_type">Business type</label>
+        <select id="business_type" name="business_type">
+          <option value="">Not set</option>
+          <% var bt = types.slice(); if (v.business_type && bt.indexOf(v.business_type) < 0) bt.push(v.business_type); bt.forEach(function (t) { %>
+            <option value="<%= t %>" <%= v.business_type === t ? 'selected' : '' %>><%= t %></option>
+          <% }) %>
+        </select>
+      </div>
+      <div class="field">
+        <label for="gstin">GSTIN</label>
+        <input type="text" id="gstin" name="gstin" value="<%= v.gstin %>" maxlength="15">
+        <%- include('_err', { k: 'gstin' }) %>
+      </div>
+      <div class="field">
+        <label for="pan">PAN</label>
+        <input type="text" id="pan" name="pan" value="<%= v.pan %>" maxlength="10">
+        <%- include('_err', { k: 'pan' }) %>
+      </div>
+      <div class="field full">
+        <label for="address">Address</label>
+        <textarea id="address" name="address" rows="2"><%= v.address %></textarea>
+      </div>
+    </div>
+    <div class="form-grid three">
+      <div class="field">
+        <label for="city">City</label>
+        <input type="text" id="city" name="city" value="<%= v.city %>" maxlength="200">
+      </div>
+      <div class="field">
+        <label for="state">State</label>
+        <input type="text" id="state" name="state" value="<%= v.state %>" maxlength="200">
+      </div>
+      <div class="field">
+        <label for="pincode">PIN code</label>
+        <input type="text" id="pincode" name="pincode" value="<%= v.pincode %>" maxlength="6" inputmode="numeric">
+        <%- include('_err', { k: 'pincode' }) %>
+      </div>
+    </div>
+    <div class="check">
+      <input type="checkbox" id="email_opt_out" name="email_opt_out" value="1" <%= v.email_opt_out ? 'checked' : '' %>>
+      <div><label for="email_opt_out">Do not send auction announcements, reminders or broadcasts</label><div class="hint">Account emails such as receipts and approvals are still sent.</div></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">Save bidder details</button>
+      <a class="btn btn-quiet" href="/admin/bidders/<%= u.id %>">Cancel</a>
+    </div>
+  </div>
+</form>

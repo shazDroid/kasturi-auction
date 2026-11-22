@@ -1,0 +1,33 @@
+<%# Auction board. Expects `board` (rows from boardRow), optional `boardTitle`, `boardLink`, `emptyText`. %>
+<div class="board">
+  <div class="board-head">
+    <h2><%= locals.boardTitle || 'Live and upcoming auctions' %></h2>
+    <% if (locals.boardLink) { %><a class="small" href="<%= boardLink[0] %>"><%= boardLink[1] %></a><% } else { %><span class="muted small">All times IST</span><% } %>
+  </div>
+  <% if (!board.length) { %>
+    <div class="empty">
+      <h3>No auctions are scheduled right now</h3>
+      <p><%= locals.emptyText || 'New auctions are usually announced a few days ahead. Registered bidders get an email when one is published.' %></p>
+    </div>
+  <% } else { %>
+    <div class="board-cols" aria-hidden="true"><span>Date</span><span>Auction</span><span>Location</span><span>Lots</span><span>Bidding window</span><span>Status</span></div>
+    <% board.forEach(function (a) { var live = a.phase === 'live'; %>
+      <a class="board-row<%= live ? ' is-live' : '' %>" href="/auctions/<%= a.id %>">
+        <div class="board-date"><b><%= a.dayNum %></b><span><%= a.month %>, <%= a.weekday %></span></div>
+        <div class="board-title"><%= a.title %><% if (a.seller_name) { %><span class="sub"><%= a.seller_name %></span><% } %></div>
+        <div class="board-cell col-loc"><%= a.location || 'Location on request' %><% if (a.category) { %><span class="sub"><%= a.category %></span><% } %></div>
+        <div class="board-cell col-lots"><%= a.lot_count %><span class="sr"> lots</span></div>
+        <div class="board-cell col-time"><%= a.window %></div>
+        <div class="board-status">
+          <% if (live) { %>
+            <span class="tag tag-live">Live</span>
+            <span class="countdown" data-countdown="<%= a.closeAt %>" data-done="Closing"></span>
+          <% } else { %>
+            <span class="sub">Starts in</span>
+            <span class="countdown" data-countdown="<%= a.startAt %>" data-done="Starting"></span>
+          <% } %>
+        </div>
+      </a>
+    <% }) %>
+  <% } %>
+</div>

@@ -1,0 +1,8 @@
+<form method="post" action="/admin/lots/<%= r.id %>/decide" class="decide">
+  <%- include('_csrf') %>
+  <input type="hidden" name="back" value="<%= backUrl %>">
+  <label class="sr" for="note-<%= r.id %>">Decision note for lot <%= r.lot_no %></label>
+  <input type="text" id="note-<%= r.id %>" name="note" class="input-sm" maxlength="500" placeholder="Note (optional)" value="<%= r.result === 'pending' ? '' : r.result_note %>">
+  <% if (r.result !== 'awarded') { %><button class="btn btn-sm" type="submit" name="decision" value="awarded" data-confirm="Award lot <%= r.lot_no %> to <%= r.name %> at <%= fmtINR(r.amount) %>? The bidder is emailed.">Award</button><% } %>
+  <% if (r.result !== 'rejected') { %><button class="btn btn-danger btn-sm" type="submit" name="decision" value="rejected" data-confirm="Reject the highest bid on lot <%= r.lot_no %>?<%= r.result === 'awarded' ? ' The winner was already emailed that they won.' : '' %>">Reject</button><% } %>
+</form>

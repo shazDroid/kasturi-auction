@@ -1,0 +1,26 @@
+<div class="page-head">
+  <div>
+    <h1>Pages</h1>
+    <p>The text of the information pages on the public site, such as About, Terms and Privacy.</p>
+  </div>
+</div>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty"><h3>No pages</h3><p>The standard pages are created when the server starts for the first time. Restart the server to create them.</p></div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Page</th><th>Address</th><th>Last edited</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (p) { %>
+      <tr>
+        <td class="cell-main"><a class="primary" href="/admin/pages/<%= encodeURIComponent(p.slug) %>"><%= p.title %></a><% if (!p.size) { %><span class="sub">Empty</span><% } %></td>
+        <td data-label="Address"><span class="code">/<%= p.slug %></span></td>
+        <td data-label="Last edited" class="nowrap"><%= fmtDT(p.updated_at) %></td>
+        <td class="actions"><a href="/admin/pages/<%= encodeURIComponent(p.slug) %>">Edit</a><a href="/<%= p.slug %>" target="_blank" rel="noopener">View on site</a></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+</div>

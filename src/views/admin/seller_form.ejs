@@ -1,0 +1,80 @@
+<div class="page-head">
+  <div>
+    <h1><%= seller ? 'Edit seller' : 'Add seller' %></h1>
+    <% if (seller) { %><p><%= seller.name %></p><% } %>
+  </div>
+</div>
+
+<% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. The seller was not saved.</div><% } %>
+
+<div class="cols">
+  <form method="post" action="<%= seller ? '/admin/sellers/' + seller.id : '/admin/sellers' %>" class="panel" novalidate>
+    <div class="panel-body">
+      <%- include('_csrf') %>
+      <div class="form-grid">
+        <div class="field full">
+          <label for="name">Seller name</label>
+          <input type="text" id="name" name="name" value="<%= v.name %>" maxlength="200" required>
+          <%- include('_err', { k: 'name' }) %>
+        </div>
+        <div class="field full">
+          <label for="location">Location</label>
+          <input type="text" id="location" name="location" value="<%= v.location %>" maxlength="200" placeholder="City and state, for example Chakan, Maharashtra">
+        </div>
+        <div class="field full">
+          <label for="description">About the seller</label>
+          <textarea id="description" name="description" rows="4"><%= v.description %></textarea>
+          <div class="hint">For your reference and for the auction page. Plain text.</div>
+        </div>
+        <div class="field">
+          <label for="contact_name">Contact person</label>
+          <input type="text" id="contact_name" name="contact_name" value="<%= v.contact_name %>" maxlength="200">
+        </div>
+        <div class="field">
+          <label for="contact_phone">Contact phone</label>
+          <input type="tel" id="contact_phone" name="contact_phone" value="<%= v.contact_phone %>" maxlength="50">
+        </div>
+        <div class="field full">
+          <label for="contact_email">Contact email</label>
+          <input type="email" id="contact_email" name="contact_email" value="<%= v.contact_email %>" maxlength="200">
+          <%- include('_err', { k: 'contact_email' }) %>
+        </div>
+      </div>
+      <div class="check">
+        <input type="checkbox" id="active" name="active" value="1" <%= v.active ? 'checked' : '' %>>
+        <div><label for="active">Active</label><div class="hint">Inactive sellers are not offered when creating a new auction.</div></div>
+      </div>
+      <div class="form-actions">
+        <button class="btn" type="submit">Save seller</button>
+        <a class="btn btn-quiet" href="/admin/sellers">Cancel</a>
+      </div>
+    </div>
+  </form>
+
+  <% if (seller) { %>
+  <div>
+    <div class="panel">
+      <div class="panel-head"><h3>Auctions</h3><a href="/admin/auctions/new?seller_id=<%= seller.id %>">New auction</a></div>
+      <div class="panel-body">
+        <% if (!locals.auctions || !auctions.length) { %>
+          <p class="muted">No auctions for this seller yet.</p>
+        <% } else { %>
+          <ul class="plain-list">
+          <% auctions.forEach(function (a) { %><li><a href="/admin/auctions/<%= a.id %>"><%= a.title %></a><span class="sub muted small"><%= fmtDate(a.starts_at) %></span></li><% }) %>
+          </ul>
+        <% } %>
+      </div>
+    </div>
+    <% if (!seller.auction_count) { %>
+    <div class="panel">
+      <div class="panel-body">
+        <form method="post" action="/admin/sellers/<%= seller.id %>/delete"><%- include('_csrf') %>
+          <p class="muted small">This seller has no auctions and can be deleted.</p>
+          <button class="btn btn-danger btn-sm" type="submit" data-confirm="Delete <%= seller.name %>? This cannot be undone.">Delete seller</button>
+        </form>
+      </div>
+    </div>
+    <% } %>
+  </div>
+  <% } %>
+</div>

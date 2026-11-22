@@ -1,0 +1,47 @@
+<div class="wrap">
+  <div class="page-head">
+    <h1>Registration fee</h1>
+    <p>A one-time yearly fee keeps casual sign-ups out of the bidding and covers verification.</p>
+  </div>
+  <%- include('_nav') %>
+  <div class="mid">
+  <% if (!fee.enabled) { %>
+    <div class="panel"><div class="panel-body"><p>No registration fee is required at the moment. You can bid once the other steps on your <a href="/account">account overview</a> are done.</p></div></div>
+  <% } else { %>
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Your status</h2>
+        <% if (fee.active && fee.expiresSoon) { %><span class="tag tag-warn">Expires soon</span><% } else if (fee.active) { %><span class="tag tag-ok">Paid</span><% } else { %><span class="tag tag-bad">Not paid</span><% } %>
+      </div>
+      <div class="panel-body">
+        <% if (fee.active) { %>
+          <p><%= fee.until === 'No expiry' ? 'Your fee is paid and does not expire.' : 'Your fee is paid and valid until ' + fee.until + '.' %><% if (fee.expiresSoon) { %> You can renew now; the new period starts when the current one ends.<% } %></p>
+        <% } else if (user.fee_paid_until) { %>
+          <p>Your fee expired on <%= fmtDate(user.fee_paid_until) %>. Pay again to keep bidding.</p>
+        <% } else { %>
+          <p>You have not paid the registration fee yet. You need it to bid.</p>
+        <% } %>
+        <table class="table fee-table">
+          <tbody>
+            <tr><td>Registration fee</td><td class="num"><%= fmtINR(fee.quote.base) %></td></tr>
+            <tr><td>GST at <%= fee.quote.gstPercent %>%</td><td class="num"><%= fmtINR(fee.quote.tax) %></td></tr>
+            <tr class="total"><td>Total payable</td><td class="num"><%= fmtINR(fee.quote.total) %></td></tr>
+          </tbody>
+        </table>
+        <p class="muted small"><%= fee.quote.validityDays > 0 ? 'Valid for ' + fee.quote.validityDays + ' days from the date of payment.' : 'Paid once; it does not expire.' %> A GST receipt is emailed to <%= user.email %>.</p>
+
+        <% if (canPay && online) { %>
+          <div id="pay-msg" class="notice hide" role="status"></div>
+          <div class="form-actions">
+            <button class="btn btn-accent" type="button" id="pay-btn"><%= fee.active ? 'Renew for ' + fmtINR(fee.quote.total) : 'Pay ' + fmtINR(fee.quote.total) + ' now' %></button>
+            <span class="muted small">UPI, cards, net banking and wallets through Razorpay.</span>
+          </div>
+        <% } else if (canPay) { %>
+          <div class="notice notice-warn"><p>Online payment is not available yet. To pay by bank transfer, contact support at <a href="mailto:<%= S.contact_email %>"><%= S.contact_email %></a><% if (S.contact_phone) { %> or <%= S.contact_phone %><% } %> and quote your bidder number <%= bidderNo(user.id) %>. We activate the fee once the transfer is received.</p></div>
+        <% } %>
+      </div>
+    </div>
+    <p class="muted small section">Paid before? See your <a href="/account/payments">payment history</a>.</p>
+  <% } %>
+  </div>
+</div>

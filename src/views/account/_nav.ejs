@@ -1,0 +1,14 @@
+<%
+  var accountTabs = [
+    ['overview', '/account', 'Overview'],
+    ['profile', '/account/profile', 'Business profile'],
+    ['verification', '/account/verification', 'Verification'],
+    ['fee', '/account/fee', 'Registration fee'],
+    ['bids', '/account/bids', 'My bids'],
+    ['payments', '/account/payments', 'Payments'],
+    ['password', '/account/password', 'Password']
+  ];
+%>
+<nav class="tabs" aria-label="Account">
+  <% accountTabs.forEach(function (t) { %><a href="<%= t[1] %>" <%- tab === t[0] ? 'aria-current="page"' : '' %>><%= t[2] %></a><% }) %>
+</nav>

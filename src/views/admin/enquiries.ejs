@@ -1,0 +1,41 @@
+<div class="page-head">
+  <div>
+    <h1>Enquiries</h1>
+    <p>Messages sent through the contact form. Open ones are listed first.</p>
+  </div>
+</div>
+
+<nav class="tabs" aria-label="Show">
+  <a href="<%= urlWith({ show: '', page: '' }) %>" <%- show === 'all' ? 'aria-current="page"' : '' %>>All</a>
+  <a href="<%= urlWith({ show: 'open', page: '' }) %>" <%- show === 'open' ? 'aria-current="page"' : '' %>>Open</a>
+  <a href="<%= urlWith({ show: 'handled', page: '' }) %>" <%- show === 'handled' ? 'aria-current="page"' : '' %>>Handled</a>
+</nav>
+
+<form class="filters" method="get" action="/admin/enquiries" role="search">
+  <% if (show !== 'all') { %><input type="hidden" name="show" value="<%= show %>"><% } %>
+  <label class="sr" for="f-q">Search</label>
+  <input type="search" id="f-q" name="q" value="<%= q %>" placeholder="Name, email, company or message">
+  <button class="btn btn-quiet" type="submit">Search</button>
+  <% if (q) { %><a href="<%= urlWith({ q: '', page: '' }) %>">Clear</a><% } %>
+</form>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty"><h3><%= show === 'open' ? 'No open enquiries' : 'No enquiries' %></h3><p>New messages from the <a href="/contact" target="_blank" rel="noopener">contact page</a> appear here<%= S.admin_notify_email ? ' and are emailed to ' + S.admin_notify_email : '' %>.</p></div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Received</th><th>From</th><th>Message</th><th>Status</th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (e) { %>
+      <tr>
+        <td data-label="Received" class="nowrap"><%= fmtDate(e.created_at) %><span class="sub"><%= fmtTime(e.created_at) %></span></td>
+        <td class="cell-main"><a class="primary" href="/admin/enquiries/<%= e.id %>"><%= e.name %></a><span class="sub"><%= e.company || e.email %></span></td>
+        <td data-label="Message" class="small"><span class="clip"><%= e.message %></span></td>
+        <td data-label="Status"><%- e.handled ? tag('yesno', false, 'Handled') : tag('result', 'pending', 'Open') %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+</div>
+<%- include('_pager') %>

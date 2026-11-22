@@ -1,0 +1,41 @@
+<div class="page-head">
+  <div>
+    <h1>Enquiry from <%= e.name %></h1>
+    <p>Received <%= fmtDT(e.created_at) %></p>
+  </div>
+  <div class="row">
+    <a class="btn btn-quiet" href="mailto:<%= e.email %>?subject=<%= encodeURIComponent('Re: your enquiry to ' + S.site_name) %>">Reply by email</a>
+    <form method="post" action="/admin/enquiries/<%= e.id %>/handled" class="inline-form"><%- include('_csrf') %>
+      <input type="hidden" name="handled" value="<%= e.handled ? '0' : '1' %>">
+      <button class="btn" type="submit"><%= e.handled ? 'Reopen' : 'Mark as handled' %></button>
+    </form>
+  </div>
+</div>
+
+<div class="cols">
+  <div class="panel">
+    <div class="panel-head"><h3>Message</h3><%- e.handled ? tag('yesno', false, 'Handled') : tag('result', 'pending', 'Open') %></div>
+    <div class="panel-body prose"><%- nl2p(e.message) %></div>
+  </div>
+  <div class="side-stack">
+    <div class="panel">
+      <div class="panel-head"><h3>Contact</h3></div>
+      <div class="panel-body">
+        <dl class="kv">
+          <dt>Name</dt><dd><%= e.name %></dd>
+          <dt>Email</dt><dd><a href="mailto:<%= e.email %>"><%= e.email %></a></dd>
+          <dt>Phone</dt><dd><%= e.phone || 'Not given' %></dd>
+          <dt>Company</dt><dd><%= e.company || 'Not given' %></dd>
+          <dt>Bidder</dt><dd><% if (bidder) { %><a href="/admin/bidders/<%= bidder.id %>"><%= bidder.name %>, <%= bidderNo(bidder.id) %></a><% } else { %>Not registered<% } %></dd>
+        </dl>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-body">
+        <form method="post" action="/admin/enquiries/<%= e.id %>/delete"><%- include('_csrf') %>
+          <button class="btn btn-danger btn-sm" type="submit" data-confirm="Delete this enquiry? This cannot be undone.">Delete enquiry</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>

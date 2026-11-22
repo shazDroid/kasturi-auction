@@ -1,0 +1,49 @@
+<div class="page-head">
+  <div>
+    <h1>Auctions and lots</h1>
+    <p>Create auctions, add lots, publish them and watch bidding live.</p>
+  </div>
+  <a class="btn" href="/admin/auctions/new">New auction</a>
+</div>
+
+<form class="filters" method="get" action="/admin/auctions" role="search">
+  <label class="sr" for="f-q">Search</label>
+  <input type="search" id="f-q" name="q" value="<%= q %>" placeholder="Auction title or seller">
+  <label class="sr" for="f-phase">Stage</label>
+  <select id="f-phase" name="phase">
+    <option value="">All stages</option>
+    <% PHASES.forEach(function (p) { %><option value="<%= p %>" <%= phase === p ? 'selected' : '' %>><%= label('phase', p) %></option><% }) %>
+  </select>
+  <button class="btn btn-quiet" type="submit">Filter</button>
+  <% if (q || phase) { %><a href="/admin/auctions">Clear filters</a><% } %>
+</form>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty">
+    <% if (q || phase) { %>
+      <h3>No auctions match these filters</h3><p>Try another search, or <a href="/admin/auctions">show all auctions</a>.</p>
+    <% } else { %>
+      <h3>No auctions yet</h3><p>Start with <a href="/admin/auctions/new">a new auction</a>. You can add lots once it is saved.</p>
+    <% } %>
+  </div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Auction</th><th>Starts</th><th>Ends</th><th class="num">Lots</th><th class="num">Bids</th><th>Stage</th><th>Status</th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (a) { %>
+      <tr>
+        <td class="cell-main"><a class="primary" href="/admin/auctions/<%= a.id %>"><%= a.title %></a><span class="sub"><%= a.seller_name || 'No seller set' %></span></td>
+        <td data-label="Starts" class="nowrap"><%= fmtDT(a.starts_at) %></td>
+        <td data-label="Ends" class="nowrap"><%= fmtDT(a.ends_at) %></td>
+        <td class="num" data-label="Lots"><%= a.lot_count %></td>
+        <td class="num" data-label="Bids"><%= fmtNum(a.bid_count) %></td>
+        <td data-label="Stage"><%- tag('phase', a.phase) %></td>
+        <td data-label="Status"><%- tag('status', a.status) %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+</div>
+<%- include('_pager') %>

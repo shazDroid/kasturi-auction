@@ -1,0 +1,30 @@
+<div class="wrap">
+  <div class="page-head">
+    <h1><%= page.title %></h1>
+    <% if (slug === 'terms' || slug === 'privacy') { %><p>Last updated <%= fmtDate(page.updated_at) %>.</p><% } %>
+  </div>
+  <div class="cols">
+    <article class="prose"><%- page.body %></article>
+    <aside>
+      <div class="panel">
+        <div class="panel-head"><h3>Questions</h3></div>
+        <div class="panel-body">
+          <p>Our team answers calls and email <%= S.support_hours ? S.support_hours.charAt(0).toLowerCase() + S.support_hours.slice(1) : 'on working days' %>.</p>
+          <dl class="kv">
+            <dt>Email</dt><dd><a href="mailto:<%= S.contact_email %>"><%= S.contact_email %></a></dd>
+            <% if (S.contact_phone) { %><dt>Phone</dt><dd><%= S.contact_phone %></dd><% } %>
+          </dl>
+          <div class="form-actions"><a class="btn btn-quiet btn-sm" href="/contact">Send a message</a></div>
+        </div>
+      </div>
+      <% if (!user && S.registration_open === '1') { %>
+        <div class="panel">
+          <div class="panel-body">
+            <p>Register your company to bid in upcoming auctions.</p>
+            <a class="btn btn-accent btn-sm" href="/register">Register to bid</a>
+          </div>
+        </div>
+      <% } %>
+    </aside>
+  </div>
+</div>

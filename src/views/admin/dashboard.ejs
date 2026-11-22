@@ -1,0 +1,108 @@
+<div class="page-head">
+  <div>
+    <h1>Dashboard</h1>
+    <p><%= fmtDay(new Date()) %>, <%= fmtDT(new Date()) %> IST</p>
+  </div>
+  <a class="btn" href="/admin/auctions/new">New auction</a>
+</div>
+
+<div class="stats">
+  <a class="stat" href="/admin/auctions?phase=live"><b><%= fmtNum(stats.live) %></b><span>Live auctions</span></a>
+  <a class="stat" href="/admin/auctions?phase=upcoming"><b><%= fmtNum(stats.upcoming) %></b><span>Upcoming auctions</span></a>
+  <a class="stat" href="/admin/bidders?kyc=pending"><b><%= fmtNum(stats.pending_kyc) %></b><span>Bidders awaiting approval</span></a>
+  <a class="stat" href="/admin/results"><b><%= fmtNum(stats.pending_results) %></b><span>Lots awaiting decision</span></a>
+  <a class="stat" href="/admin/bidders"><b><%= fmtNum(stats.bidders) %></b><span>Registered bidders</span></a>
+  <a class="stat" href="/admin/payments?status=paid"><b><%= fmtINR(stats.fee_month) || '₹0' %></b><span>Fees collected this month</span></a>
+</div>
+
+<% if (attention.length) { %>
+<section class="admin-section">
+  <h2>Needs attention</h2>
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <tbody>
+      <% attention.forEach(function (x) { %>
+        <tr>
+          <td class="cell-main"><% if (x.warn) { %><span class="tag tag-warn">Setup</span> <% } %><%= x.text %></td>
+          <td class="actions"><a href="<%= x.href %>"><%= x.action %></a></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<% } %>
+
+<section class="admin-section">
+  <div class="row-between"><h2>Live now</h2><% if (live.length) { %><a href="/admin/auctions?phase=live">All live auctions</a><% } %></div>
+  <div class="table-wrap">
+  <% if (!live.length) { %>
+    <div class="empty"><h3>No auction is live right now</h3><p>Published auctions appear here from their start time until their last lot closes.</p></div>
+  <% } else { %>
+    <table class="table table-stack">
+      <thead><tr><th>Auction</th><th class="num">Lots open</th><th class="num">Bids so far</th><th>Most active lot</th><th>Last bid</th><th>Last lot closes</th><th></th></tr></thead>
+      <tbody>
+      <% live.forEach(function (a) { %>
+        <tr>
+          <td class="cell-main"><a class="primary" href="/admin/auctions/<%= a.id %>"><%= a.title %></a><span class="sub"><%= a.seller_name || 'No seller set' %></span></td>
+          <td class="num" data-label="Lots open"><%= a.lots_open %> of <%= a.lot_count %></td>
+          <td class="num" data-label="Bids so far"><%= fmtNum(a.bid_count) %></td>
+          <td data-label="Most active lot"><%= a.busy_lot_no ? 'Lot ' + a.busy_lot_no + ', ' + a.busy_bids + ' bid' + (a.busy_bids === 1 ? '' : 's') : 'No bids yet' %></td>
+          <td data-label="Last bid"><%= a.last_bid_at ? fmtTime(a.last_bid_at) : '' %></td>
+          <td data-label="Last lot closes"><span class="countdown" data-countdown="<%= new Date(a.closes_at).getTime() %>" data-done="Closing"></span><span class="sub"><%= fmtDT(a.closes_at) %></span></td>
+          <td class="actions"><a class="btn btn-sm" href="/admin/auctions/<%= a.id %>">Monitor</a></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+  </div>
+</section>
+
+<div class="cols-even admin-section">
+  <section>
+    <div class="row-between section-head"><h2>Coming up</h2><a href="/admin/auctions?phase=upcoming">All upcoming</a></div>
+    <div class="table-wrap">
+    <% if (!upcoming.length) { %>
+      <div class="empty"><h3>No upcoming auctions</h3><p><a href="/admin/auctions/new">Create an auction</a>, add its lots and publish it.</p></div>
+    <% } else { %>
+      <table class="table table-stack">
+        <thead><tr><th>Auction</th><th>Starts</th><th class="num">Lots</th><th>Announced</th></tr></thead>
+        <tbody>
+        <% upcoming.forEach(function (a) { %>
+          <tr>
+            <td class="cell-main"><a class="primary" href="/admin/auctions/<%= a.id %>"><%= a.title %></a><span class="sub"><%= a.seller_name || '' %></span></td>
+            <td data-label="Starts" class="nowrap"><%= fmtDT(a.starts_at) %></td>
+            <td class="num" data-label="Lots"><%= a.lot_count %></td>
+            <td data-label="Announced"><%- a.announced_at ? tag('yesno', true, fmtDate(a.announced_at)) : tag('yesno', false, 'Not yet') %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+    </div>
+  </section>
+
+  <section>
+    <div class="row-between section-head"><h2>Latest bids</h2></div>
+    <div class="table-wrap">
+    <% if (!bids.length) { %>
+      <div class="empty"><h3>No bids yet</h3><p>Bids from every auction appear here as they are placed.</p></div>
+    <% } else { %>
+      <table class="table table-stack">
+        <thead><tr><th>Time</th><th>Lot</th><th>Bidder</th><th class="num">Amount</th></tr></thead>
+        <tbody>
+        <% bids.forEach(function (b) { %>
+          <tr class="<%= b.cancelled ? 'void' : '' %>">
+            <td data-label="Time" class="nowrap"><%= fmtTime(b.created_at) %><span class="sub"><%= fmtDate(b.created_at) %></span></td>
+            <td data-label="Lot"><a href="/admin/auctions/<%= b.auction_id %>"><%= b.auction_title %></a><span class="sub">Lot <%= b.lot_no %>, <%= b.lot_title %></span></td>
+            <td data-label="Bidder"><a href="/admin/bidders/<%= b.user_id %>"><%= b.name %></a><span class="sub"><%= b.company_name %></span></td>
+            <td class="num amt" data-label="Amount"><%= fmtINR(b.amount) %><% if (b.cancelled) { %><span class="sub">Cancelled</span><% } %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+    </div>
+  </section>
+</div>

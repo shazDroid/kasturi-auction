@@ -1,0 +1,39 @@
+<div class="page-head">
+  <div>
+    <h1>Activity log</h1>
+    <p>Every change made in the admin panel, with who made it. Times are IST.</p>
+  </div>
+</div>
+
+<form class="filters" method="get" action="/admin/audit" role="search">
+  <label class="sr" for="f-admin">Admin</label>
+  <select id="f-admin" name="admin">
+    <option value="">All admins</option>
+    <% admins.forEach(function (a) { %><option value="<%= a.id %>" <%= adminId === a.id ? 'selected' : '' %>><%= a.name %></option><% }) %>
+  </select>
+  <label class="sr" for="f-q">Search</label>
+  <input type="search" id="f-q" name="q" value="<%= q %>" placeholder="Action or detail, for example bidder.block">
+  <button class="btn btn-quiet" type="submit">Filter</button>
+  <% if (adminId || q) { %><a href="/admin/audit">Clear filters</a><% } %>
+</form>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty"><h3>No activity<%= adminId || q ? ' matches these filters' : ' yet' %></h3><p>Actions such as publishing an auction or approving a bidder are recorded here.</p></div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Time</th><th>Admin</th><th>Action</th><th>Detail</th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (r) { %>
+      <tr>
+        <td data-label="Time" class="nowrap"><%= fmtDTs(r.created_at) %></td>
+        <td data-label="Admin"><%= r.admin_name || 'System' %></td>
+        <td data-label="Action"><span class="code"><%= r.action %></span></td>
+        <td data-label="Detail" class="small detail-cell"><%= r.detail %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+</div>
+<%- include('_pager') %>

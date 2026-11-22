@@ -1,0 +1,59 @@
+<div class="page-head">
+  <div>
+    <h1>Bidders</h1>
+    <p>Everyone registered to bid. Open a bidder to review documents, record a fee or block the account.</p>
+  </div>
+  <a class="btn btn-quiet" href="<%= urlWith({ page: '' }).replace('/admin/bidders', '/admin/bidders.csv') %>">Download CSV</a>
+</div>
+
+<form class="filters" method="get" action="/admin/bidders" role="search">
+  <label class="sr" for="f-q">Search</label>
+  <input type="search" id="f-q" name="q" value="<%= f.q %>" placeholder="Name, company, email, phone, GSTIN or KA number">
+  <label class="sr" for="f-kyc">Documents</label>
+  <select id="f-kyc" name="kyc">
+    <option value="">Any document status</option>
+    <% KYC.forEach(function (k) { %><option value="<%= k %>" <%= f.kyc === k ? 'selected' : '' %>><%= label('kyc', k) %></option><% }) %>
+  </select>
+  <label class="sr" for="f-fee">Fee</label>
+  <select id="f-fee" name="fee">
+    <option value="">Fee paid or not</option>
+    <option value="paid" <%= f.fee === 'paid' ? 'selected' : '' %>>Fee valid</option>
+    <option value="unpaid" <%= f.fee === 'unpaid' ? 'selected' : '' %>>Fee not paid or expired</option>
+  </select>
+  <label class="sr" for="f-blocked">Account</label>
+  <select id="f-blocked" name="blocked">
+    <option value="">Blocked or not</option>
+    <option value="no" <%= f.blocked === 'no' ? 'selected' : '' %>>Active accounts</option>
+    <option value="yes" <%= f.blocked === 'yes' ? 'selected' : '' %>>Blocked accounts</option>
+  </select>
+  <button class="btn btn-quiet" type="submit">Filter</button>
+  <% if (f.q || f.kyc || f.fee || f.blocked) { %><a href="/admin/bidders">Clear filters</a><% } %>
+</form>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty">
+    <% if (f.q || f.kyc || f.fee || f.blocked) { %><h3>No bidders match these filters</h3><p>Check the spelling or <a href="/admin/bidders">clear the filters</a>.</p>
+    <% } else { %><h3>No bidders yet</h3><p>Bidders appear here when they register on the public site. Share the registration page: <a href="/register" target="_blank" rel="noopener">/register</a>.</p><% } %>
+  </div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Bidder no</th><th>Bidder</th><th>City</th><th>Email</th><th>Documents</th><th><%= feeOn ? 'Fee valid until' : 'Fee' %></th><th>Registered</th><th>Last sign in</th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (u) { %>
+      <tr>
+        <td data-label="Bidder no" class="nowrap"><span class="code"><%= bidderNo(u.id) %></span></td>
+        <td class="cell-main"><a class="primary" href="/admin/bidders/<%= u.id %>"><%= u.name %></a><span class="sub"><%= u.company_name || 'No company entered' %></span><% if (u.blocked) { %> <span class="tag tag-bad">Blocked</span><% } %></td>
+        <td data-label="City"><%= [u.city, u.state].filter(Boolean).join(', ') %></td>
+        <td data-label="Email"><%= u.email %><span class="sub"><%= u.email_verified ? 'Verified' : 'Not verified' %></span></td>
+        <td data-label="Documents"><%- tag('kyc', u.kyc_status) %><% if (u.kyc_status === 'pending' && u.kyc_submitted_at) { %><span class="sub"><%= fmtDate(u.kyc_submitted_at) %></span><% } %></td>
+        <td data-label="Fee"><% if (u.fee_paid_until && new Date(u.fee_paid_until) > new Date()) { %><%= new Date(u.fee_paid_until).getFullYear() > 2900 ? 'No expiry' : fmtDate(u.fee_paid_until) %><% } else if (u.fee_paid_until) { %><span class="tag tag-warn">Expired</span><% } else { %><span class="muted">Not paid</span><% } %></td>
+        <td data-label="Registered" class="nowrap"><%= fmtDate(u.created_at) %></td>
+        <td data-label="Last sign in" class="nowrap"><%= u.last_login_at ? fmtDate(u.last_login_at) : 'Never' %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+</div>
+<%- include('_pager') %>

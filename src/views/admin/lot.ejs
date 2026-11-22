@@ -1,0 +1,84 @@
+<%
+  var met = lot.reserve_price === null || (lot.amount !== null && lot.amount >= lot.reserve_price);
+  var decidable = lot.status === 'closed' && lot.bid_id && ['pending', 'awarded', 'rejected'].indexOf(lot.result) >= 0;
+%>
+<div class="page-head">
+  <div>
+    <h1>Lot <%= lot.lot_no %>: <%= lot.title %></h1>
+    <p><a href="/admin/auctions/<%= lot.auction_id %>"><%= lot.auction_title %></a></p>
+  </div>
+  <div class="row">
+    <a class="btn btn-quiet" href="/admin/lots/<%= lot.id %>/edit">Edit lot</a>
+    <% if (lot.status === 'open' && full.phase === 'live') { %>
+      <form method="post" action="/admin/lots/<%= lot.id %>/close-now" class="inline-form"><%- include('_csrf') %><input type="hidden" name="back" value="/admin/lots/<%= lot.id %>">
+        <button class="btn btn-danger" type="submit" data-confirm="Close lot <%= lot.lot_no %> now? It cannot be reopened.">Close now</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<div class="cols">
+  <div>
+    <% if (decidable) { %>
+    <div class="panel">
+      <div class="panel-head"><h3>Decision</h3><%- tag('result', lot.result) %></div>
+      <div class="panel-body">
+        <dl class="kv">
+          <dt>Highest bidder</dt><dd><a href="/admin/bidders/<%= lot.user_id %>"><%= lot.name %></a>, <%= lot.company_name %> (<%= bidderNo(lot.user_id) %>)</dd>
+          <dt>Contact</dt><dd><%= lot.phone || 'No phone' %>, <a href="mailto:<%= lot.email %>"><%= lot.email %></a></dd>
+          <dt>Highest bid</dt><dd><%= fmtINR(lot.amount) %></dd>
+          <dt>Total value</dt><dd><%= fmtINR(Math.round(lot.amount * lot.quantity * 100) / 100) %> <span class="muted">(bid x <%= fmtNum(lot.quantity) %> <%= lot.unit %>)</span></dd>
+          <dt>Reserve</dt><dd><%= lot.reserve_price === null ? 'No reserve' : fmtINR(lot.reserve_price) + (met ? ', met' : ', not met') %></dd>
+          <% if (lot.result_note) { %><dt>Note</dt><dd><%= lot.result_note %></dd><% } %>
+        </dl>
+        <div class="mt"><%- include('_decide', { r: lot, backUrl: '/admin/lots/' + lot.id }) %></div>
+      </div>
+    </div>
+    <% } %>
+
+    <section class="admin-section">
+      <div class="row-between"><h2>Top bidders</h2><span class="muted small"><%= bidders %> bidder<%= bidders === 1 ? '' : 's' %> in total, best bid of each</span></div>
+      <div class="table-wrap">
+      <% if (!top3.length) { %>
+        <div class="empty"><h3>No bids on this lot</h3><p><%= lot.status === 'open' ? 'Bids appear here as soon as they are placed.' : 'The lot closed without any valid bid.' %></p></div>
+      <% } else { %>
+        <table class="table table-stack">
+          <thead><tr><th>Rank</th><th>Bidder</th><th>Contact</th><th class="num">Best bid</th><th>Placed</th></tr></thead>
+          <tbody>
+          <% top3.forEach(function (t, i) { %>
+            <tr>
+              <td data-label="Rank"><%= i === 0 ? (lot.status === 'open' ? 'Leading' : 'Highest') : (i === 1 ? 'Second' : 'Third') %></td>
+              <td class="cell-main"><a class="primary" href="/admin/bidders/<%= t.user_id %>"><%= t.name %></a><span class="sub"><%= t.company_name %>, <%= bidderNo(t.user_id) %></span></td>
+              <td data-label="Contact"><%= t.phone %><span class="sub"><%= t.email %></span></td>
+              <td class="num" data-label="Best bid"><b><%= fmtINR(t.amount) %></b></td>
+              <td data-label="Placed" class="nowrap"><%= fmtDTs(t.created_at) %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+      </div>
+    </section>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Lot details</h3><%- lot.status === 'open' ? tag('result', 'open') : tag('result', lot.result || 'closed') %></div>
+    <div class="panel-body">
+      <% if (full.image_id) { %><img class="lot-photo" src="/admin/files/<%= full.image_id %>" alt="Photo of lot <%= lot.lot_no %>"><% } %>
+      <dl class="kv">
+        <dt>Quantity</dt><dd><%= fmtNum(lot.quantity) %> <%= lot.unit %></dd>
+        <dt>Opening price</dt><dd><%= fmtINR(full.start_price) %></dd>
+        <dt>Minimum raise</dt><dd><%= fmtINR(full.increment) %></dd>
+        <dt>Reserve</dt><dd><%= lot.reserve_price === null ? 'None' : fmtINR(lot.reserve_price) %></dd>
+        <dt>Valid bids</dt><dd><%= lot.bid_count %></dd>
+        <dt><%= lot.status === 'open' ? 'Closes' : 'Closed' %></dt><dd><%= fmtDTs(lot.ends_at) %><% if (lot.status === 'open' && full.phase === 'live') { %><br><span class="countdown" data-countdown="<%= new Date(lot.ends_at).getTime() %>" data-done="Closing"></span><% } %></dd>
+      </dl>
+      <% if (full.description) { %><p class="mt small"><%= full.description %></p><% } %>
+    </div>
+  </div>
+</div>
+
+<section class="admin-section">
+  <h2>All bids on this lot</h2>
+  <%- include('_bids_table', { bids: bids.map(function (b) { b.lot_id = lot.id; return b; }), showLot: false, emptyText: 'Nobody has bid on this lot.' }) %>
+</section>

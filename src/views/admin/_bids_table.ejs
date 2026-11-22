@@ -1,0 +1,23 @@
+<div class="table-wrap">
+<% if (!bids.length) { %>
+  <div class="empty"><h3>No bids yet</h3><p><%= emptyText %></p></div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Time</th><% if (showLot) { %><th>Lot</th><% } %><th>Bidder</th><th>Company</th><th class="num">Amount</th><th>IP address</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    <% bids.forEach(function (b) { %>
+      <tr class="<%= b.cancelled ? 'void' : '' %>">
+        <td data-label="Time" class="nowrap"><%= fmtDTs(b.created_at) %></td>
+        <% if (showLot) { %><td data-label="Lot"><a href="/admin/lots/<%= b.lot_id %>">Lot <%= b.lot_no %></a><span class="sub"><%= b.lot_title %></span></td><% } %>
+        <td data-label="Bidder"><a href="/admin/bidders/<%= b.user_id %>"><%= b.name %></a><span class="sub"><%= bidderNo(b.user_id) %></span></td>
+        <td data-label="Company"><%= b.company_name %></td>
+        <td class="num amt" data-label="Amount"><%= fmtINR(b.amount) %></td>
+        <td data-label="IP address"><span class="code"><%= b.ip || 'Not recorded' %></span></td>
+        <td data-label="Status"><% if (b.cancelled) { %><span class="tag tag-bad">Cancelled</span><% if (b.cancel_note) { %><span class="sub"><%= b.cancel_note %></span><% } %><% } else { %><span class="tag">Valid</span><% } %></td>
+        <td class="actions"><% if (!b.cancelled) { %><a class="danger-link" href="/admin/bids/<%= b.id %>/cancel">Cancel bid</a><% } %></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+</div>

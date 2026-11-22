@@ -1,0 +1,59 @@
+<div class="page-head">
+  <div>
+    <h1>Email log</h1>
+    <p>Every email the system has queued, newest first.</p>
+  </div>
+  <form method="post" action="/admin/emails/log/retry-failed" class="inline-form"><%- include('_csrf') %>
+    <button class="btn btn-quiet" type="submit" data-confirm="Send all failed emails from the last 7 days again?">Retry failed emails</button>
+  </form>
+</div>
+<%- include('_transport') %>
+
+<form class="filters" method="get" action="/admin/emails/log" role="search">
+  <label class="sr" for="f-q">Search</label>
+  <input type="search" id="f-q" name="q" value="<%= f.q %>" placeholder="Recipient or subject">
+  <label class="sr" for="f-status">Status</label>
+  <select id="f-status" name="status">
+    <option value="">Any status</option>
+    <% LOG_STATUSES.forEach(function (s) { %><option value="<%= s %>" <%= f.status === s ? 'selected' : '' %>><%= s.charAt(0).toUpperCase() + s.slice(1) %></option><% }) %>
+  </select>
+  <label class="sr" for="f-template">Type</label>
+  <select id="f-template" name="template">
+    <option value="">Any type</option>
+    <% templates.forEach(function (t) { %><option value="<%= t.key %>" <%= f.template === t.key ? 'selected' : '' %>><%= t.name %></option><% }) %>
+    <option value="broadcast" <%= f.template === 'broadcast' ? 'selected' : '' %>>Broadcast</option>
+    <option value="admin_message" <%= f.template === 'admin_message' ? 'selected' : '' %>>Message to a bidder</option>
+  </select>
+  <button class="btn btn-quiet" type="submit">Filter</button>
+  <% if (f.q || f.status || f.template) { %><a href="/admin/emails/log">Clear filters</a><% } %>
+</form>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty"><h3>No emails<%= (f.q || f.status || f.template) ? ' match these filters' : ' yet' %></h3><p>Emails appear here as soon as they are queued, for example when a bidder registers.</p></div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Queued</th><th>To</th><th>Subject</th><th>Type</th><th>Status</th><th>Error</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (m) { var tn = templates.find(function (t) { return t.key === m.template_key; }); %>
+      <tr>
+        <td data-label="Queued" class="nowrap"><%= fmtDate(m.created_at) %><span class="sub"><%= fmtTimeS(m.created_at) %></span></td>
+        <td data-label="To"><%= m.to_email %></td>
+        <td class="cell-main"><a class="primary" href="/admin/emails/log/<%= m.id %>"><%= m.subject %></a></td>
+        <td data-label="Type" class="small"><%= tn ? tn.name : m.template_key === 'broadcast' ? 'Broadcast' : m.template_key === 'admin_message' ? 'Message to a bidder' : (m.template_key || 'Other') %></td>
+        <td data-label="Status"><%- tag('email', m.status) %><% if (m.attempts > 1) { %><span class="sub"><%= m.attempts %> attempts</span><% } %></td>
+        <td data-label="Error" class="small err-cell"><%= m.error %></td>
+        <td class="actions">
+          <% if (m.status === 'failed' || m.status === 'skipped') { %>
+            <form method="post" action="/admin/emails/log/<%= m.id %>/retry" class="inline-form"><%- include('_csrf') %><input type="hidden" name="back" value="<%= urlWith({}) %>">
+              <button class="linkbtn" type="submit">Send again</button>
+            </form>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+</div>
+<%- include('_pager') %>

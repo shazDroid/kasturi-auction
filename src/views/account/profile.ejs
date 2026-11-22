@@ -1,0 +1,95 @@
+<%
+  function fld(name) { return errors[name] ? 'aria-invalid="true"' : ''; }
+%>
+<div class="wrap">
+  <div class="page-head">
+    <h1>Business profile</h1>
+    <p>These details appear on your fee receipt and are checked against your documents.</p>
+  </div>
+  <%- include('_nav') %>
+  <div class="mid">
+    <% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Some details need fixing. Check the fields marked below.</div><% } %>
+    <% if (locked) { %><div class="notice">Your documents are approved, so company name, GSTIN and PAN are locked. To change them, <a href="/contact">contact support</a>.</div><% } %>
+    <form class="panel" method="post" action="/account/profile" novalidate>
+      <input type="hidden" name="_csrf" value="<%= csrf %>">
+      <div class="panel-body">
+        <fieldset>
+          <legend>Contact person</legend>
+          <div class="form-grid">
+            <div class="field">
+              <label for="p-name">Full name</label>
+              <input type="text" id="p-name" name="name" value="<%= values.name %>" maxlength="100" autocomplete="name" <%- fld('name') %>>
+              <% if (errors.name) { %><div class="err"><%= errors.name %></div><% } %>
+            </div>
+            <div class="field">
+              <label for="p-phone">Mobile number</label>
+              <input type="tel" id="p-phone" name="phone" value="<%= values.phone %>" maxlength="20" autocomplete="tel" <%- fld('phone') %>>
+              <% if (errors.phone) { %><div class="err"><%= errors.phone %></div><% } %>
+            </div>
+            <div class="field full">
+              <label>Email</label>
+              <div><%= user.email %> <span class="muted small">To change your login email, contact support.</span></div>
+            </div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Company</legend>
+          <div class="form-grid">
+            <div class="field">
+              <label for="p-company">Company or firm name</label>
+              <input type="text" id="p-company" name="company_name" value="<%= values.company_name %>" maxlength="150" <%= locked ? 'readonly' : '' %> <%- fld('company_name') %>>
+              <% if (errors.company_name) { %><div class="err"><%= errors.company_name %></div><% } %>
+            </div>
+            <div class="field">
+              <label for="p-type">Business type</label>
+              <select id="p-type" name="business_type" <%- fld('business_type') %>>
+                <option value="">Choose one</option>
+                <% businessTypes.forEach(function (t) { %><option <%= values.business_type === t ? 'selected' : '' %>><%= t %></option><% }) %>
+              </select>
+              <% if (errors.business_type) { %><div class="err"><%= errors.business_type %></div><% } %>
+            </div>
+            <div class="field">
+              <label for="p-gstin">GSTIN</label>
+              <input type="text" id="p-gstin" name="gstin" value="<%= values.gstin %>" maxlength="15" autocapitalize="characters" spellcheck="false" <%= locked ? 'readonly' : '' %> <%- fld('gstin') %>>
+              <% if (errors.gstin) { %><div class="err"><%= errors.gstin %></div><% } else { %><div class="hint">15 characters. Leave empty if you are not GST registered and give your PAN instead.</div><% } %>
+            </div>
+            <div class="field">
+              <label for="p-pan">PAN</label>
+              <input type="text" id="p-pan" name="pan" value="<%= values.pan %>" maxlength="10" autocapitalize="characters" spellcheck="false" <%= locked ? 'readonly' : '' %> <%- fld('pan') %>>
+              <% if (errors.pan) { %><div class="err"><%= errors.pan %></div><% } else { %><div class="hint">10 characters, for example AAPFU0939F.</div><% } %>
+            </div>
+          </div>
+        </fieldset>
+        <fieldset>
+          <legend>Registered address</legend>
+          <div class="form-grid">
+            <div class="field full">
+              <label for="p-address">Address</label>
+              <textarea id="p-address" name="address" maxlength="400" rows="3" <%- fld('address') %>><%= values.address %></textarea>
+            </div>
+          </div>
+          <div class="form-grid three">
+            <div class="field">
+              <label for="p-city">City</label>
+              <input type="text" id="p-city" name="city" value="<%= values.city %>" maxlength="80" autocomplete="address-level2">
+            </div>
+            <div class="field">
+              <label for="p-state">State or union territory</label>
+              <select id="p-state" name="state" <%- fld('state') %>>
+                <option value="">Choose one</option>
+                <% states.forEach(function (s) { %><option <%= values.state === s ? 'selected' : '' %>><%= s %></option><% }) %>
+              </select>
+              <% if (errors.state) { %><div class="err"><%= errors.state %></div><% } %>
+            </div>
+            <div class="field">
+              <label for="p-pin">Pincode</label>
+              <input type="text" id="p-pin" name="pincode" value="<%= values.pincode %>" maxlength="6" inputmode="numeric" autocomplete="postal-code" <%- fld('pincode') %>>
+              <% if (errors.pincode) { %><div class="err"><%= errors.pincode %></div><% } %>
+            </div>
+          </div>
+        </fieldset>
+        <div class="form-actions"><button class="btn" type="submit">Save profile</button></div>
+      </div>
+    </form>
+  </div>
+</div>

@@ -1,0 +1,40 @@
+<div class="page-head">
+  <div>
+    <h1>Admin users</h1>
+    <p>People who can sign in to this admin panel. Super admins can add users and change roles; staff can do everything else.</p>
+  </div>
+  <div class="row">
+    <a class="btn btn-quiet" href="/admin/team/me">My account</a>
+    <% if (isSuper) { %><a class="btn" href="/admin/team/new">Add admin user</a><% } %>
+  </div>
+</div>
+
+<div class="table-wrap">
+  <table class="table table-stack">
+    <thead><tr><th>Name</th><th>Role</th><th>Status</th><th>Last sign in</th><th>Added</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (a) { %>
+      <tr>
+        <td class="cell-main"><b><%= a.name %></b><%= a.id === admin.id ? ' (you)' : '' %><span class="sub"><%= a.email %></span></td>
+        <td data-label="Role"><%- tag('role', a.role) %></td>
+        <td data-label="Status"><%- a.active ? tag('yesno', true, 'Active') : tag('result', 'rejected', 'Deactivated') %></td>
+        <td data-label="Last sign in" class="nowrap"><%= a.last_login_at ? fmtDT(a.last_login_at) : 'Never' %></td>
+        <td data-label="Added" class="nowrap"><%= fmtDate(a.created_at) %></td>
+        <td class="actions">
+          <% if (isSuper) { %>
+            <a href="/admin/team/<%= a.id %>/edit">Edit</a>
+            <% if (a.id !== admin.id) { %>
+              <form method="post" action="/admin/team/<%= a.id %>/active" class="inline-form"><%- include('_csrf') %>
+                <input type="hidden" name="active" value="<%= a.active ? '0' : '1' %>">
+                <button class="linkbtn <%= a.active ? 'danger' : '' %>" type="submit" data-confirm="<%= a.active ? 'Deactivate ' + a.name + '? They are signed out and cannot sign in.' : 'Reactivate ' + a.name + '?' %>"><%= a.active ? 'Deactivate' : 'Reactivate' %></button>
+              </form>
+            <% } %>
+          <% } else if (a.id === admin.id) { %>
+            <a href="/admin/team/me">Change password</a>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>

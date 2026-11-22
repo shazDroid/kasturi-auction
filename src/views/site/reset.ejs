@@ -1,0 +1,30 @@
+<div class="wrap narrow">
+<% if (!valid) { %>
+  <div class="page-head">
+    <h1>This link has expired</h1>
+    <p>Password reset links work for 1 hour and only once. Request a new link and use it within the hour.</p>
+  </div>
+  <a class="btn" href="/forgot-password">Request a new link</a>
+<% } else { %>
+  <div class="page-head">
+    <h1>Choose a new password</h1>
+    <p>Use at least 8 characters. You will sign in with it next.</p>
+  </div>
+  <form class="panel" method="post" action="/reset-password/<%= token %>" novalidate>
+    <input type="hidden" name="_csrf" value="<%= csrf %>">
+    <div class="panel-body">
+      <div class="field">
+        <label for="p-new">New password</label>
+        <input type="password" id="p-new" name="password" autocomplete="new-password" required minlength="8" <%- errors.password ? 'aria-invalid="true"' : '' %>>
+        <% if (errors.password) { %><div class="err"><%= errors.password %></div><% } %>
+      </div>
+      <div class="field">
+        <label for="p-confirm">Type it again</label>
+        <input type="password" id="p-confirm" name="confirm" autocomplete="new-password" required <%- errors.confirm ? 'aria-invalid="true"' : '' %>>
+        <% if (errors.confirm) { %><div class="err"><%= errors.confirm %></div><% } %>
+      </div>
+      <div class="form-actions"><button class="btn" type="submit">Save new password</button></div>
+    </div>
+  </form>
+<% } %>
+</div>

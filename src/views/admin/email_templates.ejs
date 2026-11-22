@@ -1,0 +1,30 @@
+<div class="page-head">
+  <div>
+    <h1>Email templates</h1>
+    <p>The wording of every automatic email. Turn a template off to stop that email being sent.</p>
+  </div>
+  <span class="muted small">Sending through: <b><%= transport === 'brevo' ? 'Brevo' : transport === 'smtp' ? 'SMTP' : 'nothing connected' %></b></span>
+</div>
+<%- include('_transport') %>
+
+<div class="table-wrap">
+  <table class="table table-stack">
+    <thead><tr><th>Template</th><th>When it is sent</th><th>Subject</th><th>Sending</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (t) { %>
+      <tr>
+        <td class="cell-main"><a class="primary" href="/admin/emails/templates/<%= t.key %>"><%= t.name %></a><span class="sub">Edited <%= fmtDate(t.updated_at) %></span></td>
+        <td data-label="When it is sent" class="small"><%= t.description %></td>
+        <td data-label="Subject" class="small"><%= t.subject %></td>
+        <td data-label="Sending"><%- t.enabled ? tag('yesno', true, 'On') : tag('result', 'rejected', 'Off') %></td>
+        <td class="actions">
+          <a href="/admin/emails/templates/<%= t.key %>">Edit</a>
+          <form method="post" action="/admin/emails/templates/<%= t.key %>/toggle" class="inline-form"><%- include('_csrf') %>
+            <button class="linkbtn <%= t.enabled ? 'danger' : '' %>" type="submit" <%- t.enabled ? 'data-confirm="Stop sending this email?"' : '' %>><%= t.enabled ? 'Turn off' : 'Turn on' %></button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>

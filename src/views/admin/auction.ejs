@@ -1,0 +1,104 @@
+<%
+  var isLive = a.phase === 'live';
+  var canAddLots = !a.window_over && a.status !== 'cancelled';
+%>
+<div class="page-head">
+  <div>
+    <h1><%= a.title %></h1>
+    <p class="row"><%- tag('phase', a.phase) %> <span><%= a.seller_name || 'No seller set' %><%= a.location ? ', ' + a.location : '' %></span></p>
+  </div>
+  <div class="row">
+    <a class="btn btn-quiet" href="/admin/auctions/<%= a.id %>/edit">Edit auction</a>
+    <% if (canAddLots) { %><a class="btn" href="/admin/auctions/<%= a.id %>/lots/new">Add lot</a><% } %>
+  </div>
+</div>
+
+<% if (a.status === 'draft') { %>
+  <div class="notice notice-warn"><p>This auction is a draft and bidders cannot see it.<%= a.lot_count ? ' Publish it when the lots and dates are final.' : ' Add at least one lot, then publish it.' %></p></div>
+<% } else if (a.status === 'cancelled') { %>
+  <div class="notice notice-error"><p>This auction is cancelled. Bidding is stopped and bidders cannot see it.</p></div>
+<% } %>
+
+<div class="panel">
+  <div class="panel-body toolbar">
+    <% if (a.status !== 'published' && a.status !== 'cancelled' || (a.status === 'cancelled' && !a.window_over)) { %>
+      <form method="post" action="/admin/auctions/<%= a.id %>/publish" class="inline-form"><%- include('_csrf') %>
+        <button class="btn btn-accent btn-sm" type="submit" <%= a.lot_count ? '' : 'disabled' %> data-confirm="<%= a.started ? 'Bidding opens immediately because the start time has passed. Publish now?' : 'Publish this auction? Bidders will be able to see it.' %>">Publish auction</button>
+      </form>
+    <% } %>
+    <% if (a.status === 'published' && !a.started) { %>
+      <form method="post" action="/admin/auctions/<%= a.id %>/unpublish" class="inline-form"><%- include('_csrf') %>
+        <button class="btn btn-quiet btn-sm" type="submit">Move back to draft</button>
+      </form>
+    <% } %>
+    <% if (a.status === 'published' && a.phase !== 'closed') { %>
+      <form method="post" action="/admin/auctions/<%= a.id %>/announce" class="inline-form"><%- include('_csrf') %>
+        <button class="btn btn-quiet btn-sm" type="submit" data-confirm="<%= a.announced_at ? 'This auction was already announced on ' + fmtDT(a.announced_at) + '. Email all bidders again?' : 'Email this auction to all bidders with a verified email?' %>">Email announcement to bidders</button>
+      </form>
+    <% } %>
+    <form method="post" action="/admin/auctions/<%= a.id %>/duplicate" class="inline-form"><%- include('_csrf') %>
+      <button class="btn btn-quiet btn-sm" type="submit">Duplicate as draft</button>
+    </form>
+    <a class="btn btn-quiet btn-sm" href="/admin/auctions/<%= a.id %>/bids.csv">Download bids (CSV)</a>
+    <a class="btn btn-quiet btn-sm" href="/admin/auctions/<%= a.id %>/results.csv">Download results (CSV)</a>
+    <span class="grow"></span>
+    <% if (a.status !== 'cancelled') { %>
+      <form method="post" action="/admin/auctions/<%= a.id %>/cancel" class="inline-form"><%- include('_csrf') %>
+        <button class="btn btn-danger btn-sm" type="submit" data-confirm="Cancel this auction? Bidding stops at once and bidders can no longer see it.">Cancel auction</button>
+      </form>
+    <% } %>
+    <% if (!a.bid_count_all) { %>
+      <form method="post" action="/admin/auctions/<%= a.id %>/delete" class="inline-form"><%- include('_csrf') %>
+        <button class="btn btn-danger btn-sm" type="submit" data-confirm="Delete this auction and its <%= a.lot_count %> lot(s)? This cannot be undone.">Delete</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h3>Summary</h3><span class="muted small">Times are IST</span></div>
+  <div class="panel-body cols-even">
+    <dl class="kv">
+      <dt>Status</dt><dd><%- tag('status', a.status) %></dd>
+      <dt>Bidding opens</dt><dd><%= fmtDT(a.starts_at) %></dd>
+      <dt>First lot closes</dt><dd><%= fmtDT(a.ends_at) %></dd>
+      <dt>Gap between lots</dt><dd><%= a.stagger_min ? a.stagger_min + ' min' : 'All lots close together' %></dd>
+      <dt>Auto-extend</dt><dd><%= a.extend_by_min ? 'Bid in last ' + a.extend_window_min + ' min adds ' + a.extend_by_min + ' min' : 'Off' %></dd>
+      <dt>Highest bid shown</dt><dd><%= a.show_highest_bid ? 'Yes' : 'No, bidders only see if they lead' %></dd>
+      <dt>Auto award</dt><dd><%= a.auto_award ? 'Yes, when reserve is met' : 'No, every lot needs a decision' %></dd>
+    </dl>
+    <dl class="kv">
+      <dt>Category</dt><dd><%= a.category || 'Not set' %></dd>
+      <dt>Lots</dt><dd><%= a.lot_count %><%= isLive ? ', ' + a.lots_open + ' still open' : '' %></dd>
+      <dt>Bids</dt><dd><%= fmtNum(a.bid_count) %> from <%= a.bidder_count %> bidder<%= a.bidder_count === 1 ? '' : 's' %></dd>
+      <dt>Announced</dt><dd><%= a.announced_at ? fmtDT(a.announced_at) : 'Not yet' %></dd>
+      <dt>Reminder email</dt><dd><%= a.reminder_sent ? 'Sent' : (S.reminder_minutes_before !== '0' ? 'Sent ' + S.reminder_minutes_before + ' min before start' : 'Turned off in settings') %></dd>
+      <dt>Public page</dt><dd><% if (a.status === 'published') { %><a href="/auctions/<%= a.id %>" target="_blank" rel="noopener">Open auction page</a><% } else { %><span class="muted">Visible after publishing</span><% } %></dd>
+    </dl>
+  </div>
+</div>
+
+<% if (isLive && a.lots_open) { %>
+<div class="panel">
+  <div class="panel-head"><h3>Live controls</h3><span class="muted small">Bidders see changes at once</span></div>
+  <div class="panel-body">
+    <form method="post" action="/admin/auctions/<%= a.id %>/extend" class="filters">
+      <%- include('_csrf') %>
+      <label for="ext-min">Extend closing time by</label>
+      <input type="number" id="ext-min" name="minutes" min="1" max="1440" step="1" value="10" class="input-sm" required>
+      <span>minutes for</span>
+      <label class="sr" for="ext-lot">Lot</label>
+      <select id="ext-lot" name="lot_id">
+        <option value="">All open lots</option>
+        <% lots.filter(function (l) { return l.status === 'open'; }).forEach(function (l) { %><option value="<%= l.id %>">Lot <%= l.lot_no %>: <%= l.title %></option><% }) %>
+      </select>
+      <button class="btn btn-sm" type="submit" data-confirm="Extend the closing time?">Extend closing time</button>
+    </form>
+    <p class="hint muted small">To end a lot early, use "Close now" in the lots table. A closed lot cannot be reopened.</p>
+  </div>
+</div>
+<% } %>
+
+<div id="live-region" <% if (isLive) { %>data-live-url="/admin/auctions/<%= a.id %>/live"<% } %>>
+  <%- include('_auction_live') %>
+</div>

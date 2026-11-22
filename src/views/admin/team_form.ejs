@@ -1,0 +1,77 @@
+<div class="page-head">
+  <div>
+    <h1><%= a ? 'Edit admin user' : 'Add admin user' %></h1>
+    <p><%= a ? a.email : 'They sign in at /admin/login with this email and password.' %></p>
+  </div>
+</div>
+
+<% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. Nothing was saved.</div><% } %>
+
+<div class="cols">
+  <form method="post" action="<%= a ? '/admin/team/' + a.id : '/admin/team' %>" class="panel" novalidate>
+    <div class="panel-body">
+      <%- include('_csrf') %>
+      <div class="form-grid">
+        <div class="field">
+          <label for="name">Name</label>
+          <input type="text" id="name" name="name" value="<%= v.name %>" maxlength="200" required>
+          <%- include('_err', { k: 'name' }) %>
+        </div>
+        <div class="field">
+          <label for="email">Email</label>
+          <input type="email" id="email" name="email" value="<%= v.email %>" maxlength="200" required autocomplete="off">
+          <%- include('_err', { k: 'email' }) %>
+        </div>
+        <div class="field">
+          <label for="role">Role</label>
+          <select id="role" name="role">
+            <option value="staff" <%= v.role === 'staff' ? 'selected' : '' %>>Staff</option>
+            <option value="superadmin" <%= v.role === 'superadmin' ? 'selected' : '' %>>Super admin</option>
+          </select>
+          <%- include('_err', { k: 'role' }) %>
+          <div class="hint">Super admins can also manage admin users.</div>
+        </div>
+        <% if (!a) { %>
+        <div class="field">
+          <label for="password">Password</label>
+          <input type="password" id="password" name="password" minlength="8" required autocomplete="new-password">
+          <%- include('_err', { k: 'password' }) %>
+          <div class="hint">At least 8 characters. Share it securely.</div>
+        </div>
+        <% } %>
+      </div>
+      <div class="form-actions">
+        <button class="btn" type="submit"><%= a ? 'Save admin user' : 'Add admin user' %></button>
+        <a class="btn btn-quiet" href="/admin/team">Cancel</a>
+      </div>
+    </div>
+  </form>
+
+  <% if (a) { %>
+  <div class="side-stack">
+    <form method="post" action="/admin/team/<%= a.id %>/password" class="panel">
+      <div class="panel-head"><h3>Reset password</h3></div>
+      <div class="panel-body">
+        <%- include('_csrf') %>
+        <div class="field">
+          <label for="new-password">New password</label>
+          <input type="password" id="new-password" name="password" minlength="8" required autocomplete="new-password">
+          <div class="hint">At least 8 characters.</div>
+        </div>
+        <button class="btn btn-quiet btn-sm" type="submit" data-confirm="Set a new password for <%= a.name %>?">Reset password</button>
+      </div>
+    </form>
+    <% if (a.id !== admin.id) { %>
+    <div class="panel">
+      <div class="panel-body">
+        <form method="post" action="/admin/team/<%= a.id %>/active"><%- include('_csrf') %>
+          <input type="hidden" name="active" value="<%= a.active ? '0' : '1' %>">
+          <p class="muted small"><%= a.active ? 'Deactivating signs them out and stops them signing in. Their activity log stays.' : 'This account is deactivated.' %></p>
+          <button class="btn <%= a.active ? 'btn-danger' : '' %> btn-sm" type="submit" data-confirm="<%= a.active ? 'Deactivate ' + a.name + '?' : 'Reactivate ' + a.name + '?' %>"><%= a.active ? 'Deactivate' : 'Reactivate' %></button>
+        </form>
+      </div>
+    </div>
+    <% } %>
+  </div>
+  <% } %>
+</div>

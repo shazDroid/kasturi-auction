@@ -1,0 +1,61 @@
+<div class="page-head">
+  <div>
+    <h1>Results</h1>
+    <p>Closed lots and their highest bids. Award a lot to email the winner, or reject it if the price is not acceptable.</p>
+  </div>
+  <% if (auctionId) { %><a class="btn btn-quiet" href="/admin/auctions/<%= auctionId %>/results.csv">Download results (CSV)</a><% } %>
+</div>
+
+<nav class="tabs" aria-label="Result">
+  <% Object.keys(FILTERS).forEach(function (k) { %>
+    <a href="<%= urlWith({ result: k === 'pending' ? '' : k, page: '' }) %>" <%- filter === k ? 'aria-current="page"' : '' %>><%= FILTERS[k] %> (<%= counts[k] || 0 %>)</a>
+  <% }) %>
+</nav>
+
+<form class="filters" method="get" action="/admin/results">
+  <% if (filter !== 'pending') { %><input type="hidden" name="result" value="<%= filter %>"><% } %>
+  <label class="sr" for="f-auction">Auction</label>
+  <select id="f-auction" name="auction">
+    <option value="">All auctions</option>
+    <% auctions.forEach(function (a) { %><option value="<%= a.id %>" <%= auctionId === a.id ? 'selected' : '' %>><%= a.title %> (<%= fmtDate(a.ends_at) %>)</option><% }) %>
+  </select>
+  <button class="btn btn-quiet" type="submit">Filter</button>
+  <% if (auctionId) { %><a href="<%= urlWith({ auction: '', page: '' }) %>">All auctions</a><% } %>
+</form>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty">
+    <% if (filter === 'pending') { %><h3>Nothing is waiting for a decision</h3><p>Lots appear here when they close with bids. Lots that meet the reserve in an auto-award auction are awarded without waiting.</p>
+    <% } else { %><h3>No lots here</h3><p>No closed lot<%= auctionId ? ' in this auction' : '' %> has the result "<%= FILTERS[filter] %>".</p><% } %>
+  </div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr>
+      <th>Lot</th><th>Highest bidder</th><th class="num">Highest bid</th><th class="num">Reserve</th><th class="num">Total value</th><th>Closed</th>
+      <th><%= filter === 'no_bids' ? '' : (filter === 'pending' ? 'Decision' : 'Change decision') %></th>
+    </tr></thead>
+    <tbody>
+    <% rows.forEach(function (r) { var met = r.reserve_price === null || (r.amount !== null && r.amount >= r.reserve_price); %>
+      <tr>
+        <td class="cell-main"><a class="primary" href="/admin/lots/<%= r.id %>">Lot <%= r.lot_no %>: <%= r.title %></a><span class="sub"><a href="/admin/auctions/<%= r.auction_id %>"><%= r.auction_title %></a></span><span class="sub"><%= fmtNum(r.quantity) %> <%= r.unit %>, <%= r.bid_count %> bid<%= r.bid_count === 1 ? '' : 's' %></span></td>
+        <td data-label="Highest bidder">
+          <% if (r.user_id) { %><a href="/admin/bidders/<%= r.user_id %>"><%= r.name %></a><span class="sub"><%= r.company_name %></span><span class="sub"><%= r.phone %></span><% } else { %><span class="muted">No bids</span><% } %>
+        </td>
+        <td class="num" data-label="Highest bid"><b><%= fmtINR(r.amount) %></b></td>
+        <td class="num" data-label="Reserve"><%= r.reserve_price === null ? 'None' : fmtINR(r.reserve_price) %><% if (r.reserve_price !== null && r.amount !== null) { %><span class="sub <%= met ? 'good' : 'bad' %>"><%= met ? 'Met' : 'Not met' %></span><% } %></td>
+        <td class="num" data-label="Total value"><%= r.amount !== null ? fmtINR(Math.round(r.amount * r.quantity * 100) / 100) : '' %></td>
+        <td data-label="Closed" class="nowrap"><%= fmtDT(r.ends_at) %></td>
+        <td class="actions">
+          <% if (r.user_id && r.result !== 'no_bids') { %>
+            <%- include('_decide', { r: r, backUrl: urlWith({}) }) %>
+            <% if (r.result !== 'pending' && r.result_note) { %><span class="sub"><%= r.result_note %></span><% } %>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+</div>
+<%- include('_pager') %>
