@@ -1,14 +1,35 @@
 <%
   var accountTabs = [
-    ['overview', '/account', 'Overview'],
-    ['profile', '/account/profile', 'Business profile'],
-    ['verification', '/account/verification', 'Verification'],
-    ['fee', '/account/fee', 'Registration fee'],
-    ['bids', '/account/bids', 'My bids'],
-    ['payments', '/account/payments', 'Payments'],
-    ['password', '/account/password', 'Password']
+    ['overview', '/account', 'Overview', 'dashboard'],
+    ['profile', '/account/profile', 'Business profile', 'factory'],
+    ['verification', '/account/verification', 'Verification', 'shield'],
+    ['fee', '/account/fee', 'Registration fee', 'rupee'],
+    ['bids', '/account/bids', 'My bids', 'gavel'],
+    ['payments', '/account/payments', 'Payments', 'card'],
+    ['password', '/account/password', 'Password', 'key']
   ];
+  var bno = typeof bidderNo === 'function' ? bidderNo(user.id) : bidderNo;
+  var el = eligibility;
+  var feePaid = !!user.fee_paid_until && new Date(user.fee_paid_until) > new Date();
+  var left = el.steps.filter(function (s) { return !s.done; }).length;
 %>
-<nav class="tabs" aria-label="Account">
-  <% accountTabs.forEach(function (t) { %><a href="<%= t[1] %>" <%- tab === t[0] ? 'aria-current="page"' : '' %>><%= t[2] %></a><% }) %>
-</nav>
+<div class="acct-head">
+  <div class="ah-row">
+    <span class="ah-avatar" aria-hidden="true"><%= String(user.company_name || user.name).trim().charAt(0).toUpperCase() %></span>
+    <div class="ah-name">
+      <b><%= user.company_name || user.name %></b>
+      <span>Bidder number <span class="code"><%= bno %></span><% if (user.company_name) { %>, <%= user.name %><% } %></span>
+    </div>
+    <div class="ah-badges">
+      <% if (el.blocked) { %><span class="tag tag-bad">Account suspended</span>
+      <% } else if (el.ok) { %><span class="tag tag-ok"><%- include('../partials/icon', { name: 'check', size: 14 }) %>Cleared to bid</span>
+      <% } else { %><span class="tag tag-warn"><%= left === 1 ? '1 step' : left + ' steps' %> before you can bid</span><% } %>
+      <span class="tag <%= user.email_verified ? '' : 'tag-warn' %>">Email <%= user.email_verified ? 'verified' : 'not verified' %></span>
+      <span class="tag <%= user.kyc_status === 'approved' ? '' : user.kyc_status === 'rejected' ? 'tag-bad' : user.kyc_status === 'pending' ? 'tag-warn' : '' %>">Documents <%= { approved: 'approved', pending: 'under review', rejected: 'not approved', incomplete: 'not submitted' }[user.kyc_status] %></span>
+      <% if (S.fee_enabled === '1') { %><span class="tag <%= feePaid ? '' : 'tag-warn' %>">Fee <%= feePaid ? 'paid' : 'not paid' %></span><% } %>
+    </div>
+  </div>
+  <nav class="tabs" aria-label="Account">
+    <% accountTabs.forEach(function (t) { %><a href="<%= t[1] %>" <%- tab === t[0] ? 'aria-current="page"' : '' %>><%- include('../partials/icon', { name: t[3], size: 16 }) %><%= t[2] %></a><% }) %>
+  </nav>
+</div>

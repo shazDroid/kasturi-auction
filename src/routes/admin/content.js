@@ -4,6 +4,11 @@ const db = require('../../db');
 const { clean } = require('../../lib/util');
 const { wrap, audit } = require('../../middleware');
 const { paginate, notFound } = require('./helpers');
+const M = require('./media-helpers');
+
+/** HTML comments in a stored page (editor notes from the default text). The editor drops them on save. */
+const notesIn = (html) => (String(html || '').match(/<!--([\s\S]*?)-->/g) || []).map((c) => c.slice(4, -3).trim()).filter(Boolean);
+const pageForm = (res, p, v, errors = {}) => res.adminPage('admin/page_form', { title: `Edit ${p.title}`, p, v, errors, notes: notesIn(p.body), ...M.EDITOR_ASSETS });
 
 const router = express.Router();
 
@@ -54,16 +59,17 @@ const loadPage = (slug) => db.one('SELECT * FROM pages WHERE slug = $1', [String
 router.get('/pages/:slug', wrap(async (req, res) => {
   const p = await loadPage(req.params.slug);
   if (!p) return notFound(res, 'This page');
-  res.adminPage('admin/page_form', { title: `Edit ${p.title}`, p, v: p, errors: {} });
+  pageForm(res, p, p);
 }));
 
 router.post('/pages/:slug', wrap(async (req, res) => {
   const p = await loadPage(req.params.slug);
   if (!p) return notFound(res, 'This page');
-  const v = { title: clean(req.body.title, 200), body: String(req.body.body || '').trim().slice(0, 150000) };
   const errors = {};
+  // Pages are rendered by the site as trusted HTML, so they are sanitised here like every rich field.
+  const v = { title: clean(req.body.title, 200), body: M.readRich(req.body, 'body', 'The page content', errors) };
   if (!v.title) errors.title = 'Enter the page title.';
-  if (Object.keys(errors).length) return res.adminPage('admin/page_form', { title: `Edit ${p.title}`, p, v, errors });
+  if (Object.keys(errors).length) return pageForm(res, p, v, errors);
   await db.query('UPDATE pages SET title = $2, body = $3, updated_at = now() WHERE slug = $1', [p.slug, v.title, v.body]);
   audit(req, 'page.update', p.slug);
   req.flash('ok', `Page "${v.title}" saved.`);

@@ -4,61 +4,124 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title ? title + ' | ' + S.site_name : S.site_name %></title>
+  <% if (locals.metaDescription) { %><meta name="description" content="<%= metaDescription %>"><% } %>
   <meta name="csrf-token" content="<%= csrf %>">
+  <meta name="theme-color" content="#0f2136">
+  <link rel="icon" href="/img/mark.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/app.css">
+  <% (locals.styles || []).forEach(function (s) { %><link rel="stylesheet" href="<%= s %>"><% }) %>
 </head>
 <body>
+<%
+  var I = function (n, size) { return include('partials/icon', { name: n, size: size || 16 }); };
+  var tel = S.contact_phone ? S.contact_phone.replace(/[^\d+]/g, '') : '';
+  var el = user ? eligibility : null;
+  var todo = el ? el.steps.filter(function (s) { return !s.done; }).length : 0;
+  var bno = user ? (typeof bidderNo === 'function' ? bidderNo(user.id) : bidderNo) : '';
+  var initial = user ? String(user.company_name || user.name || '?').trim().charAt(0).toUpperCase() : '';
+%>
+  <a class="skip" href="#main">Skip to content</a>
   <% if (S.announcement) { %><div class="announce"><div class="wrap"><%= S.announcement %></div></div><% } %>
+  <div class="utility">
+    <div class="wrap">
+      <% if (S.contact_phone) { %><a class="u-item" href="tel:<%= tel %>"><%- I('phone', 15) %><%= S.contact_phone %></a><% } %>
+      <% if (S.contact_email) { %><a class="u-item u-mail" href="mailto:<%= S.contact_email %>"><%- I('mail', 15) %><%= S.contact_email %></a><% } %>
+      <% if (S.support_hours) { %><span class="u-item u-hours"><%- I('clock', 15) %><%= S.support_hours %></span><% } %>
+      <span class="u-item u-clock" data-ist-clock><span class="u-date"><%= fmtDay(new Date()) %>, <%= fmtDate(new Date()) %>,</span> <span class="u-time"><%= fmtTime(new Date()) %></span> IST</span>
+    </div>
+  </div>
   <header class="site-header" id="site-header">
     <div class="wrap">
-      <a class="brand" href="/"><%= S.site_name %></a>
-      <button class="menu-toggle" type="button" data-toggle="#site-header" aria-label="Open menu">Menu</button>
+      <%- include('partials/brand') %>
+      <button class="menu-toggle" type="button" data-toggle="#site-header" aria-controls="site-header" aria-expanded="false" aria-label="Menu">
+        <span class="i-open"><%- I('menu', 22) %></span><span class="i-close"><%- I('close', 22) %></span>
+      </button>
       <nav class="nav" aria-label="Main">
-        <a href="/auctions" <%- path.startsWith('/auctions') ? 'aria-current="page"' : '' %>>Auctions</a>
+        <a href="/auctions" <%- path === '/auctions' || path.startsWith('/auctions/') ? 'aria-current="page"' : '' %>>Auctions</a>
         <a href="/how-it-works" <%- path === '/how-it-works' ? 'aria-current="page"' : '' %>>How bidding works</a>
         <a href="/about" <%- path === '/about' ? 'aria-current="page"' : '' %>>About</a>
         <a href="/contact" <%- path === '/contact' ? 'aria-current="page"' : '' %>>Contact</a>
       </nav>
       <div class="nav-side">
         <% if (user) { %>
-          <a href="/account" <%- path.startsWith('/account') ? 'aria-current="page"' : '' %>>My account</a>
-          <form method="post" action="/logout" class="inline-form"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-quiet btn-sm" type="submit">Sign out</button></form>
+          <details class="acct-menu">
+            <summary aria-label="Account menu">
+              <span class="acct-avatar" aria-hidden="true"><%= initial %></span>
+              <span class="acct-id"><b><%= user.company_name || user.name %></b><span><span class="dot<%= el.ok ? ' ok' : '' %>" aria-hidden="true"></span><%= bno %>, <%= el.ok ? 'cleared to bid' : (todo === 1 ? '1 step to bid' : todo + ' steps to bid') %></span></span>
+              <%- I('chevron-down', 16) %>
+            </summary>
+            <div class="acct-pop">
+              <div class="acct-state">
+                <div><b><%= user.name %></b></div>
+                <div class="muted small"><%= user.email %></div>
+                <% if (el.blocked) { %><span class="tag tag-bad">Account suspended</span>
+                <% } else if (el.ok) { %><span class="tag tag-ok">Cleared to bid</span>
+                <% } else { %><span class="tag tag-warn"><%= todo === 1 ? '1 step' : todo + ' steps' %> before you can bid</span><% } %>
+              </div>
+              <a href="/account"><%- I('dashboard', 18) %>Account overview</a>
+              <a href="/account/bids"><%- I('gavel', 18) %>My bids</a>
+              <a href="/account/verification"><%- I('shield', 18) %>Verification</a>
+              <a href="/account/profile"><%- I('factory', 18) %>Business profile</a>
+              <a href="/account/payments"><%- I('card', 18) %>Payments</a>
+              <hr>
+              <form method="post" action="/logout"><input type="hidden" name="_csrf" value="<%= csrf %>"><button type="submit"><%- I('logout', 18) %>Sign out</button></form>
+            </div>
+          </details>
         <% } else { %>
-          <a href="/login">Sign in</a>
+          <a href="/login" <%- path === '/login' ? 'aria-current="page"' : '' %>>Sign in</a>
           <% if (S.registration_open === '1') { %><a class="btn btn-accent" href="/register">Register to bid</a><% } %>
         <% } %>
       </div>
     </div>
   </header>
 
-  <main>
+  <main id="main">
     <% if (!locals.fullBleed) { %><div class="wrap"><%- include('partials/flash') %></div><% } %>
     <%- body %>
   </main>
 
-  <footer class="site-footer">
+  <footer class="site-footer on-dark">
     <div class="wrap">
-      <div>
-        <h4><%= S.site_name %></h4>
-        <% if (S.contact_address) { %><div><%= S.contact_address %></div><% } %>
-        <div><%= S.contact_email %><% if (S.contact_phone) { %>, <%= S.contact_phone %><% } %></div>
-        <% if (S.support_hours) { %><div><%= S.support_hours %></div><% } %>
+      <div class="f-about">
+        <%- include('partials/brand', { size: 30 }) %>
+        <p>Timed online auctions for industrial scrap, used machinery and surplus stores. Verified bidders, open bidding, a full bid record for every lot.</p>
+        <div class="f-contact">
+          <% if (S.contact_address) { %><div><%- I('pin', 16) %><span><%= S.contact_address %></span></div><% } %>
+          <% if (S.contact_phone) { %><a href="tel:<%= tel %>"><%- I('phone', 16) %><span><%= S.contact_phone %></span></a><% } %>
+          <a href="mailto:<%= S.contact_email %>"><%- I('mail', 16) %><span><%= S.contact_email %></span></a>
+          <% if (S.support_hours) { %><div><%- I('clock', 16) %><span><%= S.support_hours %></span></div><% } %>
+        </div>
       </div>
       <div>
-        <h4>Bidding</h4>
-        <a href="/auctions">Auction schedule</a>
+        <h4>Auctions</h4>
+        <a href="/auctions?show=live">Live now</a>
+        <a href="/auctions?show=upcoming">Upcoming</a>
+        <a href="/auctions?show=closed">Closed and results</a>
+        <a href="/auctions?view=schedule">Auction schedule</a>
+      </div>
+      <div>
+        <h4>Bidders</h4>
         <a href="/how-it-works">How bidding works</a>
-        <a href="/register">Register as a bidder</a>
+        <% if (user) { %><a href="/account">My account</a><a href="/account/bids">My bids</a><% } else { %>
+          <a href="/register">Register as a bidder</a>
+          <a href="/login">Sign in</a>
+        <% } %>
       </div>
       <div>
         <h4>Company</h4>
-        <a href="/about">About</a>
+        <a href="/about">About us</a>
+        <a href="/contact">Sell through us</a>
         <a href="/terms">Terms and conditions</a>
         <a href="/privacy">Privacy policy</a>
-        <a href="/contact">Contact</a>
+      </div>
+    </div>
+    <div class="f-bottom">
+      <div class="wrap">
+        <span>&copy; <%= new Date().getFullYear() %> <%= S.site_name %>. All times are Indian Standard Time.</span>
+        <span>Prices are shown in rupees and exclude GST unless stated.</span>
       </div>
     </div>
   </footer>

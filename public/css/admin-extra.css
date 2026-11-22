@@ -1,0 +1,178 @@
+/* Admin-only additions (v2: editor, photos, documents, specifications, dashboard charts).
+   Loaded after app.css on admin pages. Uses the tokens from app.css and does not restyle shared
+   classes (.panel, .table, .btn, .tag, .stats, sidebar); everything here is prefixed ax-. */
+
+.grow { flex: 1 1 auto; min-width: 0; }
+
+/* ---------- Rich text editor (Quill snow theme, toned down to match the inputs) ---------- */
+.ax-editor { background: var(--paper); border: 1px solid #b9c2cd; border-radius: 5px; font-family: var(--body); }
+.ax-editor:focus-within { outline: 2px solid var(--link); outline-offset: 0; border-color: var(--link); }
+.ax-editor.is-invalid { border-color: var(--stop); }
+.ax-editor .ql-toolbar.ql-snow { border: 0; border-bottom: 1px solid var(--line); padding: 6px 8px; font-family: var(--body); background: #f8f9fb; border-radius: 5px 5px 0 0; }
+.ax-editor .ql-container.ql-snow { border: 0; font: 400 15px/1.55 var(--body); color: var(--ink); }
+.ax-editor .ql-editor { min-height: 180px; padding: 12px 14px; }
+.ax-editor-tall .ql-editor { min-height: 420px; }
+.ax-editor .ql-editor.ql-blank::before { color: #8592a3; font-style: normal; left: 14px; right: 14px; }
+.ax-editor .ql-editor h2 { font-size: 20px; margin: 16px 0 8px; }
+.ax-editor .ql-editor h3 { font-size: 17px; margin: 14px 0 6px; }
+.ax-editor .ql-editor > :first-child { margin-top: 0; }
+.ax-editor .ql-editor p { margin: 0 0 10px; }
+.ax-editor .ql-editor ol, .ax-editor .ql-editor ul { padding-left: 4px; margin: 0 0 10px; }
+.ax-editor .ql-editor li { padding-left: 1.4em; }
+.ax-editor .ql-editor blockquote { border-left: 0; margin: 8px 0; padding: 8px 12px; background: var(--surface); border-radius: 4px; color: var(--ink-2); }
+.ax-editor .ql-editor a { color: var(--link); }
+.ax-editor .ql-snow .ql-stroke { stroke: var(--ink-2); }
+.ax-editor .ql-snow .ql-fill { fill: var(--ink-2); }
+.ax-editor .ql-snow .ql-picker { color: var(--ink-2); font-size: 14px; }
+.ax-editor .ql-snow.ql-toolbar button { border-radius: 4px; width: 30px; height: 28px; padding: 4px 6px; }
+.ax-editor .ql-snow.ql-toolbar button:hover, .ax-editor .ql-snow.ql-toolbar button.ql-active { background: var(--line-soft); }
+.ax-editor .ql-snow.ql-toolbar button:hover .ql-stroke, .ax-editor .ql-snow.ql-toolbar button.ql-active .ql-stroke { stroke: var(--ink); }
+.ax-editor .ql-snow.ql-toolbar button:hover .ql-fill, .ax-editor .ql-snow.ql-toolbar button.ql-active .ql-fill { fill: var(--ink); }
+.ax-editor .ql-snow.ql-toolbar button:focus-visible, .ax-editor .ql-snow .ql-picker-label:focus-visible { outline: 2px solid var(--link); outline-offset: 0; }
+.ax-editor .ql-snow .ql-picker.ql-header { width: 112px; }
+.ax-editor .ql-snow .ql-picker-label { border-radius: 4px; }
+.ax-editor .ql-snow .ql-picker-options { border-radius: 4px; border-color: var(--line); padding: 4px 8px; }
+.ax-editor .ql-snow .ql-picker.ql-header .ql-picker-label::before,
+.ax-editor .ql-snow .ql-picker.ql-header .ql-picker-item::before { content: 'Normal text'; }
+.ax-editor .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='2']::before,
+.ax-editor .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='2']::before { content: 'Heading 2'; }
+.ax-editor .ql-snow .ql-picker.ql-header .ql-picker-label[data-value='3']::before,
+.ax-editor .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='3']::before { content: 'Heading 3'; }
+.ax-editor .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='2']::before { font: 700 18px var(--display); }
+.ax-editor .ql-snow .ql-picker.ql-header .ql-picker-item[data-value='3']::before { font: 650 16px var(--display); }
+.ax-editor .ql-snow .ql-tooltip { border-color: var(--line); border-radius: 4px; box-shadow: none; color: var(--ink); font-family: var(--body); z-index: 5; }
+.ax-editor .ql-snow .ql-tooltip input[type=text] { border-color: #b9c2cd; border-radius: 4px; height: 30px; width: 220px; padding: 4px 8px; }
+.ax-editor .ql-snow .ql-tooltip a.ql-action, .ax-editor .ql-snow .ql-tooltip a.ql-remove { color: var(--link); }
+.ax-editor-switch { display: flex; gap: 12px; align-items: baseline; margin: -2px 0 6px; flex-wrap: wrap; }
+.ax-editor-switch .ax-editor-note { margin: 0; color: var(--steel); font-size: 13px; }
+
+/* Rendered rich text inside admin pages. */
+.rich h2 { font-size: 18px; margin: 14px 0 6px; }
+.rich h3 { font-size: 16px; margin: 12px 0 6px; }
+.rich > :first-child { margin-top: 0; }
+.rich ul, .rich ol { margin: 0 0 10px; padding-left: 22px; }
+.rich li { margin-bottom: 3px; }
+.rich blockquote { margin: 8px 0; padding: 8px 12px; background: var(--surface); border-radius: 4px; }
+.rich table { border-collapse: collapse; margin: 0 0 10px; }
+.rich th, .rich td { border: 1px solid var(--line); padding: 5px 8px; text-align: left; }
+.ax-rich-sm { font-size: 14px; }
+
+/* ---------- Upload fields and previews ---------- */
+.ax-cover-field, .ax-logo-field { display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; }
+.ax-cover-current { margin: 0; flex: none; }
+.ax-cover-current img { display: block; width: 240px; height: 180px; object-fit: cover; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); margin-bottom: 8px; }
+.ax-cover-current .check { margin: 0; }
+.ax-previews { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.ax-previews:empty { display: none; }
+.ax-previews > p { flex-basis: 100%; margin: 0; }
+.ax-preview { margin: 0; width: 132px; }
+.ax-preview img { display: block; width: 132px; height: 99px; object-fit: cover; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+.ax-preview figcaption { font-size: 12px; color: var(--steel); margin-top: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ax-preview-logo img { object-fit: contain; background: var(--paper); padding: 6px; }
+
+/* ---------- Lot photo gallery manager ---------- */
+.ax-gallery { list-style: none; margin: 0 0 12px; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.ax-photo { border: 1px solid var(--line); border-radius: 5px; background: var(--paper); overflow: hidden; display: flex; flex-direction: column; }
+.ax-photo-img { display: block; aspect-ratio: 4 / 3; background: var(--surface); }
+.ax-photo-img img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ax-photo-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 8px 10px 0; min-height: 30px; }
+.ax-photo-actions { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 6px 10px 10px; font-size: 13px; }
+.ax-photo-actions .linkbtn { font-size: 13px; }
+
+/* Thumbnails in tables. */
+.lots-admin .cell-main { min-width: 190px; }
+.ax-thumb-cell { width: 88px; }
+.ax-thumb-link { display: block; }
+.ax-thumb { display: block; width: 72px; height: 54px; object-fit: cover; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+.ax-thumb-empty { display: flex; align-items: center; justify-content: center; text-align: center; font-size: 11px; line-height: 1.2; color: var(--steel); text-decoration: none; border-style: dashed; padding: 4px; }
+.ax-thumb-empty:hover { color: var(--link); border-color: var(--link); }
+.ax-thumb-cell .sub { margin-top: 3px; white-space: nowrap; }
+
+/* ---------- Lot specifications ---------- */
+.ax-specs { max-width: 860px; }
+.ax-spec-row { display: grid; grid-template-columns: minmax(140px, 2fr) minmax(200px, 5fr) 70px; gap: 8px; align-items: center; margin-bottom: 8px; }
+.ax-spec-head { margin-bottom: 4px; font-size: 13px; font-weight: 500; color: var(--steel); }
+.ax-spec-row input[type=text] { padding: 7px 10px; font-size: 14px; }
+.ax-spec-row.is-bad input[aria-invalid] { border-color: var(--stop); }
+.ax-spec-tools { display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; margin: 6px 0 8px; }
+.ax-spec-tools[hidden] { display: none; }
+.ax-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.ax-chip { font: 400 13px/1 var(--body); color: var(--ink-2); background: var(--paper); border: 1px solid var(--line); border-radius: 4px; padding: 6px 9px; cursor: pointer; }
+.ax-chip:hover { border-color: #b9c2cd; background: var(--surface); }
+.ax-chip:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+.ax-spec-table th { border-right: 0; width: 40%; font-weight: 500; color: var(--steel); text-align: left; background: transparent; }
+.ax-spec-table th, .ax-spec-table td { font-size: 14px; padding-top: 7px; padding-bottom: 7px; }
+
+/* ---------- Auction workspace ---------- */
+.ax-overview-body { display: grid; grid-template-columns: 240px minmax(0, 1fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.ax-overview-body .kv { margin: 0; }
+.ax-overview-cover img { display: block; width: 240px; height: 180px; object-fit: cover; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); margin-bottom: 6px; }
+.ax-cover-empty { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 4px; width: 240px; height: 180px; border: 1px dashed #b9c2cd; border-radius: 4px; color: var(--steel); text-decoration: none; background: var(--surface); }
+.ax-cover-empty span:first-child { font-weight: 500; color: var(--ink-2); }
+.ax-cover-empty:hover { border-color: var(--link); color: var(--link); }
+.ax-doc-form { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(220px, 1.3fr) auto; gap: 0 14px; align-items: end; margin-top: 16px; }
+.panel-body > .table-wrap.flat:first-child { margin-top: -18px; border-top: 0; }
+
+/* ---------- Lot detail ---------- */
+.ax-lot-cover { display: block; margin-bottom: 8px; }
+.ax-lot-cover img { display: block; width: 100%; aspect-ratio: 4 / 3; height: auto; object-fit: cover; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); }
+.ax-strip { list-style: none; margin: 0 0 14px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.ax-strip img { display: block; width: 64px; height: 48px; object-fit: cover; border: 1px solid var(--line); border-radius: 3px; }
+.ax-strip a:hover img { border-color: var(--link); }
+
+/* ---------- Bidder detail ---------- */
+.ax-details { border-top: 1px solid var(--line-soft); padding-top: 12px; }
+.ax-details > summary { cursor: pointer; color: var(--link); font-size: 14px; font-weight: 500; }
+.ax-details[open] > summary { margin-bottom: 12px; }
+
+/* ---------- Sellers ---------- */
+.ax-logo-cell { width: 76px; }
+.ax-logo { display: block; width: 60px; height: 40px; object-fit: contain; border: 1px solid var(--line-soft); border-radius: 4px; background: var(--paper); padding: 3px; }
+.ax-logo-lg { width: 160px; height: 80px; padding: 6px; margin-bottom: 8px; }
+.ax-logo-empty { display: flex; align-items: center; justify-content: center; font: 600 13px var(--display); color: var(--steel); background: var(--surface); }
+.ax-logo-current .check { margin: 0; }
+
+/* ---------- Dashboard trends ---------- */
+.ax-trends { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(220px, 0.62fr); gap: 20px; align-items: stretch; }
+.ax-trends > .panel + .panel { margin-top: 0; }
+.ax-chart { margin: 0; }
+.ax-chart-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.ax-chart-head h3 { font-size: 15px; }
+.ax-chart-total { font-size: 13px; }
+.ax-chart-total b { font-size: 15px; font-weight: 600; }
+.ax-chart-svg { display: block; width: 100%; height: auto; overflow: visible; }
+.ax-chart-svg .ax-grid { stroke: var(--line-soft); stroke-width: 1; }
+.ax-chart-svg .ax-axis { stroke: #9aa7b6; stroke-width: 1; }
+.ax-chart-svg .ax-tick { font: 400 11px var(--body); fill: var(--steel); }
+.ax-chart-svg .ax-hit { fill: transparent; }
+.ax-chart-svg .ax-fill { fill: var(--ink-2); }
+.ax-chart-svg .ax-bar.is-today .ax-fill { fill: #7d90a8; }
+.ax-chart-svg .ax-bar:hover .ax-hit { fill: var(--surface); }
+.ax-chart-svg .ax-bar:hover .ax-fill { fill: var(--ink); }
+.ax-chart-note { margin: 6px 0 0; font-size: 12px; color: var(--steel); }
+.ax-fee-panel h3 { font-size: 15px; margin-bottom: 12px; }
+.ax-fee { margin: 0 0 10px; display: grid; gap: 12px; }
+.ax-fee > div { border-top: 1px solid var(--line-soft); padding-top: 10px; }
+.ax-fee > div:first-child { border-top: 0; padding-top: 0; }
+.ax-fee dt { font-size: 13px; color: var(--steel); margin-bottom: 2px; }
+.ax-fee dd { margin: 0; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.ax-fee dd b { font: 700 22px/1.1 var(--display); font-stretch: 88%; }
+.ax-fee-note { margin-bottom: 8px; color: var(--ink-2); }
+.ax-fee-note .good { color: var(--go); font-weight: 600; }
+.ax-fee-note .bad { color: var(--stop); font-weight: 600; }
+
+@media (max-width: 1100px) {
+  .ax-trends { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .ax-fee-panel { grid-column: 1 / -1; }
+  .ax-overview-body { grid-template-columns: 200px minmax(0, 1fr); }
+  .ax-overview-body > .kv:last-child { grid-column: 2; }
+  .ax-overview-cover img, .ax-cover-empty { width: 200px; height: 150px; }
+}
+@media (max-width: 720px) {
+  .ax-trends { grid-template-columns: 1fr; }
+  .ax-overview-body { grid-template-columns: 1fr; }
+  .ax-overview-body > .kv:last-child { grid-column: auto; }
+  .ax-spec-row { grid-template-columns: 1fr 1.6fr 60px; }
+  .ax-doc-form { grid-template-columns: 1fr; }
+  .ax-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

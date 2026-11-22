@@ -1,53 +1,112 @@
-<div class="wrap" data-server-now="<%= Date.now() %>">
-  <div class="page-head">
-    <h1><%= show === 'closed' ? 'Closed auctions' : 'Auction schedule' %></h1>
-    <p><%= show === 'closed' ? 'Past auctions with their lot results.' : 'Live auctions are listed first, then upcoming ones by start time. All times are IST.' %></p>
-  </div>
-  <nav class="tabs" aria-label="Auction lists">
-    <a href="/auctions<%= category ? '?category=' + encodeURIComponent(category) : '' %>" <%- show === 'open' ? 'aria-current="page"' : '' %>>Live and upcoming</a>
-    <a href="/auctions?show=closed<%= category ? '&category=' + encodeURIComponent(category) : '' %>" <%- show === 'closed' ? 'aria-current="page"' : '' %>>Closed</a>
-  </nav>
-  <% if (categories.length) { %>
-    <form class="filters" method="get" action="/auctions">
-      <% if (show === 'closed') { %><input type="hidden" name="show" value="closed"><% } %>
-      <label class="sr" for="cat">Category</label>
-      <select id="cat" name="category">
-        <option value="">All categories</option>
-        <% categories.forEach(function (c) { %><option <%= c === category ? 'selected' : '' %>><%= c %></option><% }) %>
-      </select>
-      <button class="btn btn-quiet btn-sm" type="submit">Show</button>
-      <% if (category) { %><a class="small" href="/auctions<%= show === 'closed' ? '?show=closed' : '' %>">Clear filter</a><% } %>
-    </form>
-  <% } %>
-
-  <% if (show === 'open') { %>
-    <%- include('_board', { board: board, boardTitle: category ? category + ' auctions' : 'Live and upcoming auctions', emptyText: category ? 'Nothing in this category is scheduled. Clear the filter to see all auctions, or check closed auctions for past results.' : null }) %>
-  <% } else if (!rows.length) { %>
-    <div class="table-wrap"><div class="empty"><h3>No closed auctions yet</h3><p><%= category ? 'Nothing in this category has closed. Clear the filter to see all closed auctions.' : 'Results will be listed here once auctions close.' %></p></div></div>
-  <% } else { %>
-    <div class="table-wrap">
-      <table class="table table-stack">
-        <thead><tr><th>Auction</th><th>Seller</th><th>Location</th><th class="num">Lots</th><th>Closed on</th><th><span class="sr">Results</span></th></tr></thead>
-        <tbody>
-          <% rows.forEach(function (a) { %>
-            <tr>
-              <td class="cell-main"><a class="primary" href="/auctions/<%= a.id %>"><%= a.title %></a><% if (a.category) { %><span class="sub"><%= a.category %></span><% } %></td>
-              <td data-label="Seller"><%= a.seller_name || 'Not disclosed' %></td>
-              <td data-label="Location"><%= a.location %></td>
-              <td class="num" data-label="Lots"><%= a.lot_count %></td>
-              <td data-label="Closed on"><%= fmtDate(a.closed_at || a.ends_at) %></td>
-              <td class="actions" data-label=""><a href="/auctions/<%= a.id %>">View results</a></td>
-            </tr>
-          <% }) %>
-        </tbody>
-      </table>
+<%
+  var I = function (n, size) { return include('../partials/icon', { name: n, size: size || 18 }); };
+  var tabs = [['open', 'Live and upcoming'], ['live', 'Live'], ['upcoming', 'Upcoming'], ['closed', 'Closed']];
+  var intro = {
+    open: 'Live auctions are listed first by closing time, then upcoming ones by start time. All times are IST.',
+    live: 'Auctions open for bidding now, soonest to close first.',
+    upcoming: 'Scheduled auctions, soonest to start first. Inspect the material before bidding opens.',
+    closed: 'Past auctions with their lot results, most recent first.'
+  };
+%>
+<div data-server-now="<%= Date.now() %>">
+  <div class="list-head">
+    <div class="wrap">
+      <ol class="crumbs"><li><a href="/">Home</a></li><li><span aria-current="page">Auctions</span></li></ol>
+      <div class="page-head">
+        <h1><%= title %></h1>
+        <p><%= intro[show] %></p>
+      </div>
+      <form class="searchbar" method="get" action="/auctions" role="search">
+        <% if (show !== 'open') { %><input type="hidden" name="show" value="<%= show %>"><% } %>
+        <% if (view !== 'cards') { %><input type="hidden" name="view" value="<%= view %>"><% } %>
+        <div class="input-ico">
+          <%- I('search') %>
+          <label class="sr" for="s-q">Material or keyword</label>
+          <input type="search" id="s-q" name="q" value="<%= q %>" placeholder="Material, grade, seller or lot" autocomplete="off">
+        </div>
+        <div>
+          <label class="sr" for="s-cat">Category</label>
+          <select id="s-cat" name="category">
+            <option value="">All categories</option>
+            <% filters.categories.forEach(function (c) { %><option <%= c === category ? 'selected' : '' %>><%= c %></option><% }) %>
+          </select>
+        </div>
+        <div class="input-ico">
+          <%- I('pin') %>
+          <label class="sr" for="s-loc">Location</label>
+          <input type="text" id="s-loc" name="location" value="<%= location %>" placeholder="City or state" list="s-locs" autocomplete="off">
+          <datalist id="s-locs"><% filters.locations.forEach(function (l) { %><option value="<%= l %>"><% }) %></datalist>
+        </div>
+        <button class="btn" type="submit">Search</button>
+      </form>
+      <nav class="tabs" aria-label="Auction status">
+        <% tabs.forEach(function (t) { %>
+          <a href="<%= keep({ show: t[0] === 'open' ? '' : t[0], page: '' }) %>" <%- show === t[0] ? 'aria-current="page"' : '' %>><%= t[1] %><% if (show === t[0]) { %> <span class="count-pill"><%= total %></span><% } %></a>
+        <% }) %>
+      </nav>
     </div>
-    <% if (pages > 1) { var base = '/auctions?show=closed' + (category ? '&category=' + encodeURIComponent(category) : '') + '&page='; %>
+  </div>
+
+  <div class="wrap">
+    <div class="list-tools">
+      <div class="filter-chips">
+        <span class="muted"><b><%= total %></b> <%= total === 1 ? 'auction' : 'auctions' %><%= filtered ? ' match your search' : '' %></span>
+        <% if (q) { %><a class="chip" href="<%= keep({ q: '', page: '' }) %>" aria-label="Remove keyword filter">"<%= q %>" <%- I('close', 14) %></a><% } %>
+        <% if (category) { %><a class="chip" href="<%= keep({ category: '', page: '' }) %>" aria-label="Remove category filter"><%= category %> <%- I('close', 14) %></a><% } %>
+        <% if (location) { %><a class="chip" href="<%= keep({ location: '', page: '' }) %>" aria-label="Remove location filter"><%= location %> <%- I('close', 14) %></a><% } %>
+        <% if (filtered) { %><a href="<%= keep({ q: '', category: '', location: '', page: '' }) %>">Clear all</a><% } %>
+      </div>
+      <div class="viewtoggle" role="group" aria-label="View">
+        <a href="<%= keep({ view: '', page: '' }) %>" <%- view === 'cards' ? 'aria-current="true"' : '' %>><%- I('grid', 16) %>Cards</a>
+        <a href="<%= keep({ view: 'schedule', page: '' }) %>" <%- view === 'schedule' ? 'aria-current="true"' : '' %>><%- I('list', 16) %>Schedule</a>
+      </div>
+    </div>
+
+    <% if (!rows.length) { %>
+      <div class="panel"><div class="empty">
+        <div class="empty-ico"><%- I(filtered ? 'search' : 'calendar', 24) %></div>
+        <% if (filtered) { %>
+          <h3>No auctions match your search</h3>
+          <p>Try a broader keyword, another category or location, or <a href="<%= keep({ q: '', category: '', location: '', page: '' }) %>">clear the filters</a>.<% if (show !== 'closed') { %> Past sales are listed under <a href="<%= keep({ show: 'closed', page: '' }) %>">Closed</a>.<% } %></p>
+        <% } else if (show === 'closed') { %>
+          <h3>No closed auctions yet</h3><p>Results will be listed here once auctions close.</p>
+        <% } else { %>
+          <h3>No auctions are scheduled right now</h3>
+          <p>New auctions are usually announced a few days ahead. Registered bidders get an email when one is published.</p>
+        <% } %>
+      </div></div>
+    <% } else if (view === 'cards') { %>
+      <div class="card-grid">
+        <% rows.forEach(function (a) { %><%- include('_card', { a: a }) %><% }) %>
+      </div>
+    <% } else if (show !== 'closed') { %>
+      <%- include('_board', { board: rows, boardTitle: title }) %>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="table table-stack">
+          <thead><tr><th>Auction</th><th>Seller</th><th>Location</th><th class="num">Lots</th><th>Closed on</th><th><span class="sr">Results</span></th></tr></thead>
+          <tbody>
+            <% rows.forEach(function (a) { %>
+              <tr>
+                <td class="cell-main"><a class="primary" href="/auctions/<%= a.id %>"><%= a.title %></a><% if (a.category) { %><span class="sub"><%= a.category %></span><% } %></td>
+                <td data-label="Seller"><%= a.seller_name || 'Not disclosed' %></td>
+                <td data-label="Location"><%= a.location %></td>
+                <td class="num" data-label="Lots"><%= a.lot_count %></td>
+                <td data-label="Closed on"><%= fmtDate(a.closed_at || a.ends_at) %></td>
+                <td class="actions" data-label=""><a href="/auctions/<%= a.id %>">View results</a></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <% if (pages > 1) { %>
       <nav class="pager" aria-label="Pages">
-        <% if (page > 1) { %><a class="btn btn-quiet btn-sm" href="<%= base + (page - 1) %>">Previous</a><% } %>
-        <span>Page <%= page %> of <%= pages %>, <%= total %> auctions</span>
-        <% if (page < pages) { %><a class="btn btn-quiet btn-sm" href="<%= base + (page + 1) %>">Next</a><% } %>
+        <% if (page > 1) { %><a class="btn btn-quiet btn-sm" href="<%= keep({ page: page - 1 }) %>"><%- I('chevron-left', 16) %>Previous</a><% } %>
+        <span>Page <%= page %> of <%= pages %></span>
+        <% if (page < pages) { %><a class="btn btn-quiet btn-sm" href="<%= keep({ page: page + 1 }) %>">Next<%- I('chevron-right', 16) %></a><% } %>
       </nav>
     <% } %>
-  <% } %>
+  </div>
 </div>

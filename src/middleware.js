@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 const multer = require('multer');
+const sharp = require('sharp');
+const rich = require('./lib/rich');
 const db = require('./db');
 const settings = require('./lib/settings');
 const util = require('./lib/util');
@@ -57,6 +59,8 @@ const context = wrap(async (req, res, next) => {
     path: req.path,
     query: req.query,
     razorpayKey: process.env.RAZORPAY_KEY_ID || '',
+    rich: rich.render,
+    excerpt: rich.excerpt,
     title: '',
   });
   next();
@@ -101,11 +105,16 @@ const audit = (req, action, detail = '') =>
   db.query('INSERT INTO audit_log(admin_id, action, detail) VALUES($1,$2,$3)', [req.admin ? req.admin.id : null, action, String(detail).slice(0, 1000)]).catch(() => {});
 
 const ALLOWED_UPLOADS = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
-/** Multer instance: files kept in memory (max 5 MB, PDF/JPG/PNG/WebP) and then stored in Postgres via saveFile(). */
+/** Multer instance: files kept in memory (max 8 MB, PDF/JPG/PNG/WebP) and then stored in Postgres via saveFile(). */
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024, files: 10 },
-  fileFilter: (req, file, cb) => cb(null, ALLOWED_UPLOADS.includes(file.mimetype)),
+  limits: { fileSize: 8 * 1024 * 1024, files: 12 },
+  fileFilter: (req, file, cb) => {
+    const ok = ALLOWED_UPLOADS.includes(file.mimetype);
+    // Skipped files are listed so a route can tell the user instead of ignoring them silently.
+    if (!ok) (req.rejectedUploads = req.rejectedUploads || []).push({ field: file.fieldname, name: file.originalname, mime: file.mimetype });
+    cb(null, ok);
+  },
 });
 
 /** Store an uploaded multer file in the files table; returns the new file id. */
@@ -114,6 +123,22 @@ async function saveFile(file) {
     [util.clean(file.originalname, 200), file.mimetype, file.size, file.buffer]);
   return row.id;
 }
+
+/**
+ * Store an uploaded photo: auto-rotated, resized to fit 1800px, re-encoded as WebP, with a 640px
+ * thumbnail alongside. Returns the new file id. Throws if the file is not a readable image.
+ */
+async function saveImage(file) {
+  const img = sharp(file.buffer, { failOn: 'none' }).rotate();
+  const full = await img.clone().resize({ width: 1800, height: 1800, fit: 'inside', withoutEnlargement: true }).webp({ quality: 82 }).toBuffer({ resolveWithObject: true });
+  const thumb = await img.clone().resize({ width: 640, height: 480, fit: 'cover' }).webp({ quality: 74 }).toBuffer();
+  const name = util.clean(file.originalname, 180).replace(/\.[a-z0-9]+$/i, '') + '.webp';
+  const row = await db.one(
+    'INSERT INTO files(filename, mime, size, data, thumb, width, height) VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING id',
+    [name, 'image/webp', full.data.length, full.data, thumb, full.info.width, full.info.height]);
+  return row.id;
+}
+const isImage = (file) => !!file && /^image\/(jpeg|png|webp)$/.test(file.mimetype);
 
 /** Stream a stored file to the response. inline=false forces a download. */
 async function sendFile(res, fileId, { inline = true } = {}) {
@@ -126,4 +151,4 @@ async function sendFile(res, fileId, { inline = true } = {}) {
   res.send(f.data);
 }
 
-module.exports = { wrap, flash, csrf, context, pages, requireUser, requireAdmin, requireSuperadmin, audit, upload, saveFile, sendFile };
+module.exports = { wrap, flash, csrf, context, pages, requireUser, requireAdmin, requireSuperadmin, audit, upload, saveFile, saveImage, isImage, sendFile };

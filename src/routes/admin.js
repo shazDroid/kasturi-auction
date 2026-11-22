@@ -69,6 +69,8 @@ router.use(wrap(async (req, res, next) => {
             (SELECT count(*)::int FROM enquiries WHERE NOT handled) AS "openEnquiries"`
   );
   Object.assign(res.locals, helpers.viewHelpers(req));
+  // Admin-only styles on every admin page. A page that passes its own `styles` must include it too.
+  res.locals.styles = ['/css/admin-extra.css'];
   // Admin pages should never be cached by the browser or a proxy.
   res.set('Cache-Control', 'no-store');
   next();

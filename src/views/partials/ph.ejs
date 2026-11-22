@@ -1,0 +1,9 @@
+<%# Designed placeholder for an auction or lot without photos. Expects category; optional sub (second line), small (icon only), iconSize. %><%
+var c = String(locals.category || '').toLowerCase();
+var k = /non[\s-]?ferrous|copper|alumin|brass|zinc|lead|cable/.test(c) ? 'nonferrous'
+  : /ferrous|steel|iron|\bms\b|cast/.test(c) ? 'ferrous'
+  : /machin|equipment|plant|vehicle/.test(c) ? 'machinery'
+  : /e-?waste|batter|electr|transformer/.test(c) ? 'ewaste'
+  : /plastic|rubber|polymer|pet\b/.test(c) ? 'plastics'
+  : /mixed|general|other/.test(c) ? 'mixed' : 'package';
+%><div class="ph ph-<%= k %><%= locals.small ? ' ph-sm' : '' %>" role="img" aria-label="<%= locals.category ? category : 'Material' %>, no photo yet"><span class="ph-ico"><%- include('icon', { name: k, size: locals.iconSize || (locals.small ? 24 : 40), cls: '' }) %></span><% if (!locals.small) { %><span class="ph-label"><%= locals.category || 'Industrial material' %><% if (locals.sub) { %><span class="ph-sub"><%= sub %></span><% } %></span><% } %></div>

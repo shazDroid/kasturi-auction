@@ -1,17 +1,38 @@
-<!doctype html>
+<%
+  var site = (locals.S && S.site_name) || 'Kasturi Auction';
+  var t = String(locals.title || 'Something went wrong');
+  var ico = /not found/i.test(t) ? 'search' : /back soon|maintenance/i.test(t) ? 'clock' : /session|too many/i.test(t) ? 'shield' : 'alert';
+  var maint = ico === 'clock';
+%><!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title><%= title %></title>
+  <meta name="robots" content="noindex">
+  <title><%= t %> | <%= site %></title>
+  <link rel="icon" href="/img/mark.svg" type="image/svg+xml">
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/app.css">
 </head>
 <body>
-  <header class="site-header"><div class="wrap"><a class="brand" href="/"><%= (locals.S && S.site_name) || 'Kasturi Auction' %></a></div></header>
-  <main><div class="wrap mid">
-    <div class="page-head"><h1><%= title %></h1><p><%= message %></p></div>
-    <a class="btn" href="/">Go to the homepage</a>
-  </div></main>
+  <div class="err-page">
+    <header><div class="wrap"><%- include('partials/brand', { S: locals.S || { site_name: site } }) %></div></header>
+    <main style="padding:0">
+      <div class="err-card">
+        <div class="empty-ico"><%- include('partials/icon', { name: ico, size: 26 }) %></div>
+        <h1><%= t %></h1>
+        <p><%= locals.message || 'The request could not be completed.' %></p>
+        <div class="form-actions">
+          <% if (maint) { %>
+            <% if (locals.S && S.contact_email) { %><a class="btn btn-quiet" href="mailto:<%= S.contact_email %>">Email <%= S.contact_email %></a><% } %>
+          <% } else { %>
+            <a class="btn" href="/auctions">See current auctions</a>
+            <a class="btn btn-quiet" href="/">Go to the homepage</a>
+          <% } %>
+        </div>
+      </div>
+    </main>
+    <footer><div class="wrap">&copy; <%= new Date().getFullYear() %> <%= site %><% if (locals.S && S.contact_phone) { %>. Support: <%= S.contact_phone %><% } %></div></footer>
+  </div>
 </body>
 </html>

@@ -61,19 +61,51 @@
     </section>
   </div>
 
-  <div class="panel">
-    <div class="panel-head"><h3>Lot details</h3><%- lot.status === 'open' ? tag('result', 'open') : tag('result', lot.result || 'closed') %></div>
-    <div class="panel-body">
-      <% if (full.image_id) { %><img class="lot-photo" src="/admin/files/<%= full.image_id %>" alt="Photo of lot <%= lot.lot_no %>"><% } %>
-      <dl class="kv">
-        <dt>Quantity</dt><dd><%= fmtNum(lot.quantity) %> <%= lot.unit %></dd>
-        <dt>Opening price</dt><dd><%= fmtINR(full.start_price) %></dd>
-        <dt>Minimum raise</dt><dd><%= fmtINR(full.increment) %></dd>
-        <dt>Reserve</dt><dd><%= lot.reserve_price === null ? 'None' : fmtINR(lot.reserve_price) %></dd>
-        <dt>Valid bids</dt><dd><%= lot.bid_count %></dd>
-        <dt><%= lot.status === 'open' ? 'Closes' : 'Closed' %></dt><dd><%= fmtDTs(lot.ends_at) %><% if (lot.status === 'open' && full.phase === 'live') { %><br><span class="countdown" data-countdown="<%= new Date(lot.ends_at).getTime() %>" data-done="Closing"></span><% } %></dd>
-      </dl>
-      <% if (full.description) { %><p class="mt small"><%= full.description %></p><% } %>
+  <div class="side-stack">
+    <div class="panel">
+      <div class="panel-head"><h3>Lot details</h3><%- lot.status === 'open' ? tag('result', 'open') : tag('result', lot.result || 'closed') %></div>
+      <div class="panel-body">
+        <% if (photos.length) { %>
+          <a href="/media/<%= photos[0].file_id %>" target="_blank" rel="noopener" class="ax-lot-cover"><img src="/media/<%= photos[0].file_id %>?size=thumb" alt="Cover photo of lot <%= lot.lot_no %>" width="640" height="480"></a>
+          <% if (photos.length > 1) { %>
+          <ul class="ax-strip" aria-label="More photos">
+            <% photos.slice(1).forEach(function (p, i) { %><li><a href="/media/<%= p.file_id %>" target="_blank" rel="noopener"><img src="/media/<%= p.file_id %>?size=thumb" alt="Photo <%= i + 2 %> of lot <%= lot.lot_no %>" width="96" height="72" loading="lazy"></a></li><% }) %>
+          </ul>
+          <% } %>
+        <% } else { %>
+          <p class="muted small">No photos. <a href="/admin/lots/<%= lot.id %>/edit#photos">Add photos</a></p>
+        <% } %>
+        <dl class="kv">
+          <dt>Quantity</dt><dd><%= fmtNum(lot.quantity) %> <%= lot.unit %></dd>
+          <dt>Opening price</dt><dd><%= fmtINR(full.start_price) %></dd>
+          <dt>Minimum raise</dt><dd><%= fmtINR(full.increment) %></dd>
+          <dt>Reserve</dt><dd><%= lot.reserve_price === null ? 'None' : fmtINR(lot.reserve_price) %></dd>
+          <dt>Valid bids</dt><dd><%= lot.bid_count %></dd>
+          <dt><%= lot.status === 'open' ? 'Closes' : 'Closed' %></dt><dd><%= fmtDTs(lot.ends_at) %><% if (lot.status === 'open' && full.phase === 'live') { %><br><span class="countdown" data-countdown="<%= new Date(lot.ends_at).getTime() %>" data-done="Closing"></span><% } %></dd>
+        </dl>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Specifications</h3><a class="small" href="/admin/lots/<%= lot.id %>/edit#specifications">Edit</a></div>
+      <% if (full.specs && full.specs.length) { %>
+        <div class="table-wrap flat">
+          <table class="table ax-spec-table">
+            <tbody>
+            <% full.specs.forEach(function (x) { %><tr><th scope="row"><%= x.label %></th><td><%= x.value %></td></tr><% }) %>
+            </tbody>
+          </table>
+        </div>
+      <% } else { %>
+        <div class="panel-body"><p class="muted small">None entered.</p></div>
+      <% } %>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Description</h3></div>
+      <div class="panel-body">
+        <% if (full.description) { %><div class="rich ax-rich-sm"><%- rich(full.description) %></div><% } else { %><p class="muted small">No description.</p><% } %>
+      </div>
     </div>
   </div>
 </div>

@@ -18,10 +18,11 @@
   <div class="empty"><% if (q) { %><h3>No sellers match "<%= q %>"</h3><p><a href="/admin/sellers">Show all sellers</a>.</p><% } else { %><h3>No sellers yet</h3><p><a href="/admin/sellers/new">Add the first seller</a> before creating its auctions.</p><% } %></div>
 <% } else { %>
   <table class="table table-stack">
-    <thead><tr><th>Seller</th><th>Contact</th><th class="num">Auctions</th><th>Last auction</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th><span class="sr">Logo</span></th><th>Seller</th><th>Contact</th><th class="num">Auctions</th><th>Last auction</th><th>Status</th><th></th></tr></thead>
     <tbody>
     <% rows.forEach(function (s) { %>
       <tr>
+        <td class="ax-logo-cell"><% if (s.logo_id) { %><img class="ax-logo" src="/media/<%= s.logo_id %>" alt="<%= s.name %> logo" loading="lazy"><% } else { %><span class="ax-logo ax-logo-empty" aria-hidden="true"><%= s.name.replace(/[^A-Za-z ]/g, '').split(' ').filter(Boolean).slice(0, 2).map(function (w) { return w[0]; }).join('').toUpperCase() %></span><% } %></td>
         <td class="cell-main"><a class="primary" href="/admin/sellers/<%= s.id %>/edit"><%= s.name %></a><span class="sub"><%= s.location %></span></td>
         <td data-label="Contact"><%= s.contact_name %><span class="sub"><%= [s.contact_phone, s.contact_email].filter(Boolean).join(', ') %></span></td>
         <td class="num" data-label="Auctions"><%= s.auction_count %></td>

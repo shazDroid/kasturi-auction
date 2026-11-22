@@ -3,46 +3,72 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
   <title><%= title ? title + ' | Admin' : 'Admin' %></title>
   <meta name="csrf-token" content="<%= csrf %>">
+  <link rel="icon" href="/img/mark.svg" type="image/svg+xml">
   <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/app.css">
+  <% (locals.styles || []).forEach(function (s) { %><link rel="stylesheet" href="<%= s %>"><% }) %>
 </head>
 <body>
 <%
   var nav = locals.adminNav || {};
   function cur(prefix, exact) { var p = '/admin' + (prefix === '/' ? '' : prefix); return (exact ? (path === p || path === p + '/') : path.startsWith(p)) ? 'aria-current="page"' : ''; }
+  var I = function (n) { return include('../partials/icon', { name: n, size: 18 }); };
+  var groups = [
+    [null, [['/', '/admin', 'Dashboard', 'dashboard', null, true]]],
+    ['Auctions', [
+      ['/auctions', '/admin/auctions', 'Auctions and lots', 'gavel'],
+      ['/sellers', '/admin/sellers', 'Sellers', 'factory'],
+      ['/results', '/admin/results', 'Results', 'award', nav.pendingResults]
+    ]],
+    ['Bidders', [
+      ['/bidders', '/admin/bidders', 'Bidders', 'users', nav.pendingKyc],
+      ['/payments', '/admin/payments', 'Payments', 'card']
+    ]],
+    ['Communication', [
+      ['/emails/templates', '/admin/emails/templates', 'Email templates', 'template'],
+      ['/emails/broadcast', '/admin/emails/broadcast', 'Send a broadcast', 'send'],
+      ['/emails/log', '/admin/emails/log', 'Email log', 'mail'],
+      ['/enquiries', '/admin/enquiries', 'Enquiries', 'inbox', nav.openEnquiries]
+    ]],
+    ['Site', [
+      ['/pages', '/admin/pages', 'Pages', 'page'],
+      ['/settings', '/admin/settings', 'Settings', 'sliders'],
+      ['/team', '/admin/team', 'Admin users', 'key'],
+      ['/audit', '/admin/audit', 'Activity log', 'activity']
+    ]]
+  ];
+  // Section name for the top bar, from the active nav item.
+  var area = 'Admin';
+  groups.forEach(function (g) { g[1].forEach(function (it) { if (cur(it[0], it[5])) area = g[0] ? g[0] + ' / ' + it[2] : it[2]; }); });
+  var aName = admin ? admin.name : '';
 %>
 <div class="admin">
   <aside class="admin-side">
-    <a class="brand" href="/admin"><%= S.site_name %></a>
+    <%- include('../partials/brand', { href: '/admin', size: 28 }) %>
     <nav aria-label="Admin">
-      <a href="/admin" <%- cur('/', true) %>>Dashboard</a>
-      <div class="group">Auctions</div>
-      <a href="/admin/auctions" <%- cur('/auctions') %>>Auctions and lots</a>
-      <a href="/admin/sellers" <%- cur('/sellers') %>>Sellers</a>
-      <a href="/admin/results" <%- cur('/results') %>>Results <% if (nav.pendingResults) { %><span class="count"><%= nav.pendingResults %></span><% } %></a>
-      <div class="group">Bidders</div>
-      <a href="/admin/bidders" <%- cur('/bidders') %>>Bidders <% if (nav.pendingKyc) { %><span class="count"><%= nav.pendingKyc %></span><% } %></a>
-      <a href="/admin/payments" <%- cur('/payments') %>>Payments</a>
-      <div class="group">Communication</div>
-      <a href="/admin/emails/templates" <%- cur('/emails/templates') %>>Email templates</a>
-      <a href="/admin/emails/broadcast" <%- cur('/emails/broadcast') %>>Send a broadcast</a>
-      <a href="/admin/emails/log" <%- cur('/emails/log') %>>Email log</a>
-      <a href="/admin/enquiries" <%- cur('/enquiries') %>>Enquiries <% if (nav.openEnquiries) { %><span class="count"><%= nav.openEnquiries %></span><% } %></a>
-      <div class="group">Site</div>
-      <a href="/admin/pages" <%- cur('/pages') %>>Pages</a>
-      <a href="/admin/settings" <%- cur('/settings') %>>Settings</a>
-      <a href="/admin/team" <%- cur('/team') %>>Admin users</a>
-      <a href="/admin/audit" <%- cur('/audit') %>>Activity log</a>
+      <% groups.forEach(function (g) { %>
+        <% if (g[0]) { %><div class="group"><%= g[0] %></div><% } %>
+        <% g[1].forEach(function (it) { %>
+          <a href="<%= it[1] %>" <%- cur(it[0], it[5]) %>><%- I(it[3]) %><span class="lbl"><%= it[2] %></span><% if (it[4]) { %><span class="count"><%= it[4] %></span><% } %></a>
+        <% }) %>
+      <% }) %>
     </nav>
+    <div class="side-foot">All times IST</div>
   </aside>
   <div class="admin-main">
     <div class="admin-top">
-      <a href="/" target="_blank" rel="noopener">View public site</a>
-      <div class="row">
-        <span class="muted"><%= admin ? admin.name : '' %></span>
-        <form method="post" action="/admin/logout" class="inline-form"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-quiet btn-sm" type="submit">Sign out</button></form>
+      <div class="at-area"><span class="sr">Section:</span><b><%= area %></b><% if (title && area.indexOf(title) < 0) { %><span aria-hidden="true">/</span><span class="nowrap"><%= title %></span><% } %></div>
+      <div class="at-user">
+        <a class="link-ico small" href="/" target="_blank" rel="noopener"><%- I('external') %>Public site</a>
+        <span class="at-sep" aria-hidden="true"></span>
+        <% if (admin) { %>
+          <span class="at-avatar" aria-hidden="true"><%= aName.trim().charAt(0).toUpperCase() %></span>
+          <span class="who"><b><%= aName %></b><span><%= admin.role === 'superadmin' ? 'Super admin' : 'Staff' %></span></span>
+        <% } %>
+        <form method="post" action="/admin/logout" class="inline-form"><input type="hidden" name="_csrf" value="<%= csrf %>"><button class="btn btn-quiet btn-sm" type="submit"><%- I('logout') %>Sign out</button></form>
       </div>
     </div>
     <div class="admin-content">
@@ -51,6 +77,7 @@
     </div>
   </div>
 </div>
+<div class="toasts" id="toasts" aria-live="polite"></div>
 <script src="/js/site.js"></script>
 <% (locals.scripts || []).forEach(function (s) { %><script src="<%= s %>"></script><% }) %>
 </body>

@@ -5,6 +5,7 @@ const bidding = require('../../lib/bidding');
 const { clean, toInt, fmtDT, bidderNo } = require('../../lib/util');
 const { wrap, audit } = require('../../middleware');
 const { paginate, notFound, sendCsv, back, label } = require('./helpers');
+const { lotPhotos } = require('./media-helpers');
 
 const router = express.Router();
 const FILTERS = { pending: 'Awaiting decision', awarded: 'Awarded', rejected: 'Rejected', no_bids: 'No bids' };
@@ -71,7 +72,8 @@ router.get('/lots/:id(\\d+)', wrap(async (req, res) => {
   const bids = await db.many(
     `SELECT b.*, u.name, u.company_name FROM bids b JOIN users u ON u.id = b.user_id WHERE b.lot_id = $1 ORDER BY b.id DESC LIMIT 200`, [lot.id]
   );
-  res.adminPage('admin/lot', { title: `Lot ${lot.lot_no}: ${lot.title}`, lot, full, top3: ranking.slice(0, 3), bidders: ranking.length, bids, serverNow: Date.now() });
+  const photos = await lotPhotos(lot.id);
+  res.adminPage('admin/lot', { title: `Lot ${lot.lot_no}: ${lot.title}`, lot, full, photos, top3: ranking.slice(0, 3), bidders: ranking.length, bids, serverNow: Date.now() });
 }));
 
 router.get('/auctions/:id(\\d+)/results.csv', wrap(async (req, res) => {

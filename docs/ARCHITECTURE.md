@@ -45,3 +45,13 @@ Node 20+, Express 4, EJS, PostgreSQL, Socket.IO. No build step. Deployed on Rend
 - Left aligned. Page starts with `.page-head` (h1 and optionally one plain sentence). Sentence case everywhere.
 - Copy: plain, specific, active voice, written for a scrap trader or a plant stores manager. Buttons say what they do ("Place bid", "Save auction", "Approve bidder"). Empty states say what to do next (`.empty`). Errors say what went wrong and how to fix it. No marketing fluff, no exclamation marks.
 - Status uses `.tag` variants: `tag-live`, `tag-upcoming`, `tag-ok`, `tag-warn`, `tag-bad`, plain `tag` for closed/draft.
+
+## Version 2 additions (images, documents, rich text, specifications)
+Already in place:
+- Schema (see the v2 block at the end of `src/schema.sql`): `files.thumb/width/height`, `auctions.cover_id`, `sellers.logo_id`, `lots.specs` (jsonb array of `{label, value}`), `lot_images(lot_id, file_id, sort_order)`, `auction_documents(auction_id, file_id, title)`. `lots.image_id` is legacy: do not read or write it any more; a lot's cover is its first `lot_images` row (ORDER BY sort_order, id).
+- `src/middleware.js`: `saveImage(multerFile) -> fileId` (auto-rotate, max 1800px, WebP, plus a 640x480 thumbnail), `isImage(file)`, `saveFile` (for PDFs), upload limit 8 MB, up to 12 files (`upload.array('images', 12)`).
+- `src/routes/media.js`: `GET /media/:fileId` and `GET /media/:fileId?size=thumb`. Public for files attached to published auctions (cover, lot photos, documents) and seller logos; admins can open any file. Use these URLs everywhere for photos and documents.
+- `src/lib/rich.js`: `sanitize(html)` (run on editor HTML before saving), `render(value)` and `excerpt(value, max)`. Views get them as locals: `<%- rich(auction.description) %>` (handles both editor HTML and old plain text) and `<%= excerpt(lot.description, 140) %>`. Wrap rendered rich text in an element with class `rich`.
+- Quill 2 is served at `/vendor/quill/quill.js` and `/vendor/quill/quill.snow.css` (CSP allows only same-origin scripts, so never use a CDN).
+- Both layouts accept `styles: ['/css/x.css']` as well as `scripts: [...]`.
+- Rich text fields: `auctions.description`, `auctions.inspection`, `auctions.terms`, `lots.description`. They now hold sanitised editor HTML (older rows hold plain text).

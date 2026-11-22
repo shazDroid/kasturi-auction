@@ -1,0 +1,22 @@
+<%# Server-rendered bar chart. c: { id, title, unit, W, H, left, right, top, baseY, ticks, bars, total, busiest }. Hover shows <title>. %>
+<figure class="ax-chart" aria-labelledby="chart-<%= c.id %>-title">
+  <figcaption class="ax-chart-head">
+    <h3 id="chart-<%= c.id %>-title"><%= c.title %></h3>
+    <span class="ax-chart-total"><b><%= fmtNum(c.total) %></b> <%= c.unit %><%= c.total === 1 ? '' : 's' %><% if (c.busiest) { %><span class="muted">, busiest day <%= c.busiest.label %> (<%= fmtNum(c.busiest.n) %>)</span><% } %></span>
+  </figcaption>
+  <svg class="ax-chart-svg" viewBox="0 0 <%= c.W %> <%= c.H %>" role="img" aria-label="<%= c.title %>: <%= c.bars.map(function (b) { return b.label + ' ' + b.n; }).join(', ') %>" preserveAspectRatio="xMidYMid meet">
+    <% c.ticks.forEach(function (t) { %>
+      <line class="<%= t.v === 0 ? 'ax-axis' : 'ax-grid' %>" x1="<%= c.left %>" x2="<%= c.W - c.right %>" y1="<%= t.y.toFixed(1) %>" y2="<%= t.y.toFixed(1) %>"></line>
+      <text class="ax-tick" x="<%= c.left - 6 %>" y="<%= (t.y + 4).toFixed(1) %>" text-anchor="end"><%= fmtNum(t.v) %></text>
+    <% }) %>
+    <% c.bars.forEach(function (b) { %>
+      <g class="ax-bar<%= b.today ? ' is-today' : '' %>">
+        <title><%= b.weekday %> <%= b.label %><%= b.today ? ' (today, so far)' : '' %>: <%= fmtNum(b.n) %> <%= c.unit %><%= b.n === 1 ? '' : 's' %></title>
+        <rect class="ax-hit" fill="transparent" x="<%= b.slotX.toFixed(1) %>" y="<%= c.top %>" width="<%= b.slotW.toFixed(1) %>" height="<%= (c.baseY - c.top).toFixed(1) %>"></rect>
+        <% if (b.h > 0) { %><rect class="ax-fill" fill="#1d3552" x="<%= b.x.toFixed(1) %>" y="<%= b.y.toFixed(1) %>" width="<%= b.w.toFixed(1) %>" height="<%= b.h.toFixed(1) %>"></rect><% } %>
+        <% if (b.showLabel) { %><text class="ax-tick" x="<%= (b.x + b.w / 2).toFixed(1) %>" y="<%= c.baseY + 16 %>" text-anchor="middle"><%= b.today ? 'Today' : b.label %></text><% } %>
+      </g>
+    <% }) %>
+  </svg>
+  <p class="ax-chart-note">Days in IST. Today, still running, is the lighter bar. Point at a bar for its count.</p>
+</figure>

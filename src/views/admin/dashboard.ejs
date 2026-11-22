@@ -33,6 +33,31 @@
 </section>
 <% } %>
 
+<%
+  var feeDiff = fees.last_to_date ? Math.round((fees.this_month - fees.last_to_date) / fees.last_to_date * 100) : null;
+%>
+<section class="admin-section ax-trends" aria-label="Activity">
+  <div class="panel ax-chart-panel"><div class="panel-body"><%- include('_bar_chart', { c: charts[0] }) %></div></div>
+  <div class="panel ax-chart-panel"><div class="panel-body"><%- include('_bar_chart', { c: charts[1] }) %></div></div>
+  <div class="panel ax-fee-panel">
+    <div class="panel-body">
+      <h3>Registration fees</h3>
+      <dl class="ax-fee">
+        <div><dt><%= fees.this_name %> so far</dt><dd><b><%= fmtINR(fees.this_month) || '₹0' %></b><span class="muted small"><%= fees.this_count %> payment<%= fees.this_count === 1 ? '' : 's' %></span></dd></div>
+        <div><dt><%= fees.last_name %>, full month</dt><dd><b><%= fmtINR(fees.last_month) || '₹0' %></b><span class="muted small"><%= fees.last_count %> payment<%= fees.last_count === 1 ? '' : 's' %></span></dd></div>
+      </dl>
+      <p class="small ax-fee-note">
+        <% if (feeDiff === null) { %>
+          <span class="muted">Nothing was collected by this date last month, so there is no comparison yet.</span>
+        <% } else { %>
+          <span class="<%= feeDiff >= 0 ? 'good' : 'bad' %>"><%= feeDiff >= 0 ? feeDiff + '% more' : Math.abs(feeDiff) + '% less' %></span> than by this date in <%= fees.last_name %> (<%= fmtINR(fees.last_to_date) %>).
+        <% } %>
+      </p>
+      <a class="small" href="/admin/payments?status=paid">See payments</a>
+    </div>
+  </div>
+</section>
+
 <section class="admin-section">
   <div class="row-between"><h2>Live now</h2><% if (live.length) { %><a href="/admin/auctions?phase=live">All live auctions</a><% } %></div>
   <div class="table-wrap">

@@ -8,9 +8,8 @@
 <% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. The seller was not saved.</div><% } %>
 
 <div class="cols">
-  <form method="post" action="<%= seller ? '/admin/sellers/' + seller.id : '/admin/sellers' %>" class="panel" novalidate>
+  <form method="post" enctype="multipart/form-data" action="<%= seller ? '/admin/sellers/' + seller.id : '/admin/sellers' %>?_csrf=<%= csrf %>" class="panel" novalidate>
     <div class="panel-body">
-      <%- include('_csrf') %>
       <div class="form-grid">
         <div class="field full">
           <label for="name">Seller name</label>
@@ -38,6 +37,24 @@
           <label for="contact_email">Contact email</label>
           <input type="email" id="contact_email" name="contact_email" value="<%= v.contact_email %>" maxlength="200">
           <%- include('_err', { k: 'contact_email' }) %>
+        </div>
+      </div>
+      <div class="field">
+        <span class="label" id="logo-label">Logo</span>
+        <div class="ax-logo-field">
+          <% if (seller && v.logo_id) { %>
+            <div class="ax-logo-current">
+              <img class="ax-logo ax-logo-lg" src="/media/<%= v.logo_id %>" alt="Current logo of <%= seller.name %>">
+              <div class="check"><input type="checkbox" id="remove_logo" name="remove_logo" value="1" <%= v.remove_logo ? 'checked' : '' %>><label for="remove_logo">Remove logo</label></div>
+            </div>
+          <% } %>
+          <div class="grow">
+            <label class="sr" for="logo">Logo file</label>
+            <input type="file" id="logo" name="logo" accept="image/jpeg,image/png,image/webp" data-preview="logo-preview" data-preview-kind="logo" aria-labelledby="logo-label">
+            <%- include('_err', { k: 'logo' }) %>
+            <div class="hint">Optional. PNG with a white or transparent background works best. Shown with the seller name on auction pages.<% if (Object.keys(errors).length) { %> If you had chosen a logo, choose it again.<% } %></div>
+            <div class="ax-previews" id="logo-preview" aria-live="polite"></div>
+          </div>
         </div>
       </div>
       <div class="check">

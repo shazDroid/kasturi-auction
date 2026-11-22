@@ -5,11 +5,12 @@
   </div>
 </div>
 
-<% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. The lot was not saved. If you chose a photo, choose it again.</div><% } %>
+<% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. The lot was not saved. If you chose photos, choose them again.</div><% } %>
 
 <form method="post" enctype="multipart/form-data" novalidate
       action="<%= lot ? '/admin/lots/' + lot.id : '/admin/auctions/' + auction.id + '/lots' %>?_csrf=<%= csrf %>">
   <div class="panel">
+    <div class="panel-head"><h3>Lot details</h3></div>
     <div class="panel-body">
       <div class="form-grid three">
         <div class="field">
@@ -34,11 +35,83 @@
           <input type="text" id="title" name="title" value="<%= v.title %>" maxlength="200" required placeholder="For example HMS 1 and 2 melting scrap">
           <%- include('_err', { k: 'title' }) %>
         </div>
-        <div class="field full">
-          <label for="description">Description</label>
-          <textarea id="description" name="description" rows="4" placeholder="Grade, condition, packing, lifting terms specific to this lot"><%= v.description %></textarea>
-        </div>
       </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3 id="description-label">Description</h3><span class="muted small">Condition, origin, packing and anything specific to this lot</span></div>
+    <div class="panel-body">
+      <div class="field">
+        <label class="sr" for="description">Description</label>
+        <textarea id="description" name="description" rows="6" data-rich data-label-id="description-label" data-placeholder="For example: Clean CRCA offcuts from the press shop, baled in bundles of about 1 MT, stored under a shed."><%= v.description %></textarea>
+        <%- include('_err', { k: 'description' }) %>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="specifications">
+    <div class="panel-head"><h3>Specifications</h3><span class="muted small">Shown to bidders as a table. Up to <%= SPEC_ROWS %> rows.</span></div>
+    <div class="panel-body">
+      <% if (errors.specs) { %><div class="notice notice-error" role="alert"><p><%= errors.specs %></p></div><% } %>
+      <% var rows = specRows.slice(); for (var k = 0; k < 3; k++) rows.push({ label: '', value: '' }); %>
+      <div class="ax-specs" data-specs data-max="<%= SPEC_ROWS %>">
+        <div class="ax-spec-row ax-spec-head" aria-hidden="true"><span>Label</span><span>Value</span><span></span></div>
+        <div class="ax-spec-rows">
+        <% rows.forEach(function (r, i) { var bad = errors.specs && ((r.label && !r.value) || (!r.label && r.value)); %>
+          <div class="ax-spec-row<%= bad ? ' is-bad' : '' %>">
+            <input type="text" name="spec_label" value="<%= r.label %>" maxlength="<%= SPEC_LABEL_MAX %>" list="spec-labels" aria-label="Specification label, row <%= i + 1 %>" placeholder="<%= i === 0 && !r.label ? 'For example Grade' : '' %>"<%- bad && !r.label ? ' aria-invalid="true"' : '' %>>
+            <input type="text" name="spec_value" value="<%= r.value %>" maxlength="<%= SPEC_VALUE_MAX %>" aria-label="Specification value, row <%= i + 1 %>" placeholder="<%= i === 0 && !r.value ? 'For example IS 2062 E250' : '' %>"<%- bad && !r.value ? ' aria-invalid="true"' : '' %>>
+            <button type="button" class="linkbtn danger ax-spec-remove" hidden>Remove</button>
+          </div>
+        <% }) %>
+        </div>
+        <datalist id="spec-labels"><% SPEC_LABELS.concat(['Form', 'Origin', 'Weight per piece', 'Dimensions', 'Running hours', 'Capacity', 'Recovery']).forEach(function (l) { %><option value="<%= l %>"><% }) %></datalist>
+        <div class="ax-spec-tools" hidden>
+          <button type="button" class="btn btn-quiet btn-sm" data-spec-add>Add row</button>
+          <span class="muted small">Quick add:</span>
+          <span class="ax-chips"><% SPEC_LABELS.forEach(function (l) { %><button type="button" class="ax-chip" data-spec-chip="<%= l %>"><%= l %></button><% }) %></span>
+        </div>
+        <p class="hint muted small">Rows left empty are ignored. Keep values short, for example "2 to 8 mm" or "Bundles of about 1 MT".</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel" id="photos">
+    <div class="panel-head"><h3>Photos</h3><span class="muted small"><%= photos.length %> of <%= MAX_PHOTOS %>. The first photo is the cover.</span></div>
+    <div class="panel-body">
+      <% if (photos.length) { %>
+        <ol class="ax-gallery" aria-label="Photos of this lot, in display order">
+        <% photos.forEach(function (p, i) { %>
+          <li class="ax-photo">
+            <a href="/media/<%= p.file_id %>" target="_blank" rel="noopener" class="ax-photo-img"><img src="/media/<%= p.file_id %>?size=thumb" alt="Photo <%= i + 1 %> of lot <%= lot.lot_no %>" width="320" height="240" loading="lazy"></a>
+            <div class="ax-photo-meta">
+              <% if (i === 0) { %><span class="tag tag-ok">Cover</span><% } else { %><span class="muted small">Photo <%= i + 1 %></span><% } %>
+              <% if (p.width) { %><span class="muted small"><%= p.width %> x <%= p.height %></span><% } %>
+            </div>
+            <div class="ax-photo-actions">
+              <% if (i > 0) { %><button class="linkbtn" type="submit" form="ph-<%= p.id %>" name="op" value="cover">Make cover</button><% } %>
+              <% if (i > 0) { %><button class="linkbtn" type="submit" form="ph-<%= p.id %>" name="op" value="left" aria-label="Move photo <%= i + 1 %> left">Move left</button><% } %>
+              <% if (i < photos.length - 1) { %><button class="linkbtn" type="submit" form="ph-<%= p.id %>" name="op" value="right" aria-label="Move photo <%= i + 1 %> right">Move right</button><% } %>
+              <button class="linkbtn danger" type="submit" form="ph-<%= p.id %>" name="op" value="remove" data-confirm="Remove photo <%= i + 1 %>? It is deleted and cannot be restored.">Remove</button>
+            </div>
+          </li>
+        <% }) %>
+        </ol>
+        <p class="hint muted small">Changes to photos are saved at once. Save other edits on this page first.</p>
+      <% } %>
+      <% if (photos.length < MAX_PHOTOS) { %>
+      <div class="field">
+        <label for="images"><%= photos.length ? 'Add more photos' : 'Add photos' %></label>
+        <input type="file" id="images" name="images" multiple accept="image/jpeg,image/png,image/webp" data-preview="images-preview" data-max-files="<%= MAX_PHOTOS - photos.length %>">
+        <%- include('_err', { k: 'images' }) %>
+        <div class="hint">JPG, PNG or WebP, up to 8 MB each. You can add <%= MAX_PHOTOS - photos.length %> more. Photos are added after the existing ones when you save the lot.</div>
+        <div class="ax-previews" id="images-preview" aria-live="polite"></div>
+      </div>
+      <% } else { %>
+        <%- include('_err', { k: 'images' }) %>
+        <p class="muted small">This lot has the maximum of <%= MAX_PHOTOS %> photos. Remove one to add another.</p>
+      <% } %>
     </div>
   </div>
 
@@ -70,27 +143,12 @@
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-head"><h3>Photo</h3></div>
-    <div class="panel-body">
-      <% if (lot && v.image_id) { %>
-        <div class="row field">
-          <img class="lot-thumb lot-thumb-lg" src="/admin/files/<%= v.image_id %>" alt="Current photo of lot <%= lot.lot_no %>">
-          <div class="check"><input type="checkbox" id="remove_image" name="remove_image" value="1"><label for="remove_image">Remove this photo</label></div>
-        </div>
-      <% } %>
-      <div class="field">
-        <label for="image"><%= lot && v.image_id ? 'Replace photo' : 'Photo (optional)' %></label>
-        <input type="file" id="image" name="image" accept="image/jpeg,image/png,image/webp">
-        <%- include('_err', { k: 'image' }) %>
-        <div class="hint">JPG, PNG or WebP, up to 5 MB.</div>
-      </div>
-    </div>
-  </div>
-
   <div class="form-actions mt">
     <button class="btn" type="submit">Save lot</button>
     <% if (!lot) { %><button class="btn btn-quiet" type="submit" name="and_next" value="1">Save and add another</button><% } %>
     <a class="btn btn-quiet" href="/admin/auctions/<%= auction.id %>">Cancel</a>
   </div>
 </form>
+
+<% if (lot) { photos.forEach(function (p) { %><form id="ph-<%= p.id %>" method="post" action="/admin/lots/<%= lot.id %>/photos/<%= p.id %>" class="hide"><%- include('_csrf') %></form>
+<% }) } %>

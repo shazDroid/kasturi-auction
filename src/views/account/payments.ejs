@@ -1,9 +1,9 @@
 <div class="wrap">
+  <%- include('_nav') %>
   <div class="page-head">
     <h1>Payments</h1>
     <p>Registration fee payments made from this account. Receipts were emailed at the time of payment.</p>
   </div>
-  <%- include('_nav') %>
   <% if (!rows.length) { %>
     <div class="table-wrap"><div class="empty"><h3>No payments yet</h3><p><% if (S.fee_enabled === '1') { %>Pay the registration fee from the <a href="/account/fee">registration fee</a> page.<% } else { %>No registration fee is required at the moment.<% } %></p></div></div>
   <% } else { %>

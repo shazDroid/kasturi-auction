@@ -8,6 +8,48 @@ const { integrations } = require('./integrations');
 
 const router = express.Router();
 
+const DAY_FMT = new Intl.DateTimeFormat('en-IN', { day: 'numeric', month: 'short', timeZone: 'UTC' });
+const WEEKDAY_FMT = new Intl.DateTimeFormat('en-IN', { weekday: 'short', timeZone: 'UTC' });
+
+/** A "nice" axis top for a maximum value: 1, 2, 5 or 10 times a power of ten, at least 4. */
+function niceMax(max) {
+  if (max <= 4) return 4;
+  const p = 10 ** Math.floor(Math.log10(max));
+  for (const m of [1, 2, 2.5, 5, 10]) if (m * p >= max) return m * p;
+  return 10 * p;
+}
+
+/**
+ * Geometry for a small server-rendered bar chart (inline SVG in the view, no JS).
+ * rows: [{ day: 'YYYY-MM-DD', n }]. Coordinates are in a 360 x 190 viewBox, close to the rendered size so text stays legible.
+ */
+function barChart(rows) {
+  const W = 360, H = 190, left = 28, right = 4, top = 10, bottom = 24;
+  const plotW = W - left - right, plotH = H - top - bottom;
+  const max = Math.max(0, ...rows.map((r) => r.n));
+  const yMax = niceMax(max);
+  const step = plotW / rows.length;
+  const barW = Math.max(4, Math.min(18, step - 6));
+  const ticks = [0, yMax / 2, yMax].map((v) => ({ v, y: top + plotH - (v / yMax) * plotH }));
+  const bars = rows.map((r, i) => {
+    const d = new Date(r.day + 'T00:00:00Z');
+    const h = r.n ? Math.max(2, (r.n / yMax) * plotH) : 0;
+    const x = left + i * step + (step - barW) / 2;
+    return {
+      n: r.n, x, w: barW, y: top + plotH - h, h, slotX: left + i * step, slotW: step,
+      label: DAY_FMT.format(d), weekday: WEEKDAY_FMT.format(d),
+      // A label every third day, counted back from today so the last bar is always labelled.
+      showLabel: (rows.length - 1 - i) % 3 === 0,
+      today: i === rows.length - 1,
+    };
+  });
+  return {
+    W, H, left, right, top, plotH, baseY: top + plotH, ticks, bars,
+    total: rows.reduce((t, r) => t + r.n, 0), max,
+    busiest: max ? bars.slice().sort((a, b) => b.n - a.n)[0] : null,
+  };
+}
+
 router.get('/', wrap(async (req, res) => {
   const stats = await db.one(
     `SELECT
@@ -62,7 +104,37 @@ router.get('/', wrap(async (req, res) => {
   if (transport === 'none') attention.push({ warn: true, text: `Email is not connected, so no email leaves the system. Set ${intg.mail.envHint} on the server.`, href: '/admin/settings#integrations', action: 'Check integrations' });
   if (!razorpay.configured()) attention.push({ warn: true, text: 'Online fee payment is off because Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET (and RAZORPAY_WEBHOOK_SECRET for the webhook).', href: '/admin/settings#integrations', action: 'Check integrations' });
 
-  res.adminPage('admin/dashboard', { title: 'Dashboard', stats, live, upcoming, bids, attention });
+  // Activity for the last 14 IST days, today included. Days without rows come back as 0.
+  const daily = (table, where) => db.many(
+    `SELECT to_char(d, 'YYYY-MM-DD') AS day, COALESCE(x.n, 0)::int AS n
+       FROM generate_series((now() AT TIME ZONE 'Asia/Kolkata')::date - 13, (now() AT TIME ZONE 'Asia/Kolkata')::date, interval '1 day') d
+       LEFT JOIN (SELECT (created_at AT TIME ZONE 'Asia/Kolkata')::date AS day, count(*) AS n FROM ${table}
+                   WHERE created_at >= now() - interval '15 days' ${where} GROUP BY 1) x ON x.day = d::date
+      ORDER BY d`
+  );
+  const [bidDays, regDays] = await Promise.all([daily('bids', 'AND NOT cancelled'), daily('users', '')]);
+  const fees = await db.one(
+    `WITH m AS (SELECT date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata') AS this_start)
+     SELECT COALESCE(sum(p.amount) FILTER (WHERE p.paid_at >= (m.this_start AT TIME ZONE 'Asia/Kolkata')), 0) AS this_month,
+            count(*) FILTER (WHERE p.paid_at >= (m.this_start AT TIME ZONE 'Asia/Kolkata'))::int AS this_count,
+            COALESCE(sum(p.amount) FILTER (WHERE p.paid_at >= ((m.this_start - interval '1 month') AT TIME ZONE 'Asia/Kolkata')
+                                             AND p.paid_at < (m.this_start AT TIME ZONE 'Asia/Kolkata')), 0) AS last_month,
+            count(*) FILTER (WHERE p.paid_at >= ((m.this_start - interval '1 month') AT TIME ZONE 'Asia/Kolkata')
+                               AND p.paid_at < (m.this_start AT TIME ZONE 'Asia/Kolkata'))::int AS last_count,
+            COALESCE(sum(p.amount) FILTER (WHERE p.paid_at >= ((m.this_start - interval '1 month') AT TIME ZONE 'Asia/Kolkata')
+                                             AND p.paid_at < now() - interval '1 month'), 0) AS last_to_date,
+            to_char(m.this_start, 'FMMonth') AS this_name, to_char(m.this_start - interval '1 month', 'FMMonth') AS last_name
+       FROM m LEFT JOIN payments p ON p.status = 'paid' AND p.paid_at >= ((m.this_start - interval '1 month') AT TIME ZONE 'Asia/Kolkata')
+      GROUP BY m.this_start`
+  );
+
+  res.adminPage('admin/dashboard', {
+    title: 'Dashboard', stats, live, upcoming, bids, attention, fees,
+    charts: [
+      { id: 'bids', title: 'Bids in the last 14 days', unit: 'bid', ...barChart(bidDays), href: '/admin/auctions' },
+      { id: 'regs', title: 'Registrations in the last 14 days', unit: 'registration', ...barChart(regDays), href: '/admin/bidders' },
+    ],
+  });
 }));
 
 module.exports = router;

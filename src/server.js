@@ -48,6 +48,7 @@ async function main() {
   }));
   app.use(compression());
   app.use(express.static(path.join(__dirname, '..', 'public'), { maxAge: PROD ? '1h' : 0 }));
+  app.use('/vendor/quill', express.static(path.join(__dirname, '..', 'node_modules', 'quill', 'dist'), { maxAge: PROD ? '7d' : 0 }));
   app.get('/healthz', (req, res) => res.send('ok'));
 
   // Razorpay signs the raw request body, so the webhook must see it unparsed.
@@ -71,6 +72,7 @@ async function main() {
 
   app.use(mw.flash, mw.context, mw.pages, mw.csrf);
 
+  app.use(require('./routes/media'));
   app.use('/admin', require('./routes/admin'));
 
   // Maintenance mode closes the public site; admins are unaffected.
@@ -86,7 +88,7 @@ async function main() {
   app.use((req, res) => res.status(404).render('error', { title: 'Page not found', message: 'This page does not exist or has been moved.' }));
   app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
     if (err && err.code === 'LIMIT_FILE_SIZE') {
-      req.flash && req.flash('error', 'That file is larger than 5 MB. Upload a smaller file.');
+      req.flash && req.flash('error', 'That file is larger than 8 MB. Upload a smaller file.');
       return res.redirect(req.get('referer') || '/');
     }
     console.error(err);

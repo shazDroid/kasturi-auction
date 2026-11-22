@@ -1,0 +1,195 @@
+<%
+  var a = auction, l = lot;
+  var phase = a.phase, live = phase === 'live', upcoming = phase === 'upcoming';
+  var open = l.status === 'open';
+  var plural = function (n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); };
+  var I = function (n, size) { return include('../partials/icon', { name: n, size: size || 18 }); };
+  var here = '/auctions/' + a.id + '/lots/' + l.id;
+  var loginHref = '/login?next=' + encodeURIComponent(here);
+  function kb(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+  // Kept in step with resultFor() in public/js/room.js.
+  function resultFor(x) {
+    if (x.result === 'awarded') return x.won ? ['Awarded to you', 'tag-ok'] : ['Sold', ''];
+    if (x.result === 'pending') return ['Awaiting seller decision', 'tag-warn'];
+    if (x.result === 'rejected') return ['Not sold', ''];
+    if (x.result === 'no_bids') return ['No bids', ''];
+    return ['Closed', ''];
+  }
+  var r = resultFor(l);
+  var mine = !!(user && l.myBid);
+  var panelClass = !mine ? '' : (open ? (l.leading ? 'leading' : 'outbid') : (l.won ? 'leading' : ''));
+%>
+<div class="wrap" data-server-now="<%= serverNow %>">
+  <ol class="crumbs">
+    <li><a href="/">Home</a></li><li><a href="/auctions">Auctions</a></li>
+    <li><a href="/auctions/<%= a.id %>"><%= a.title %></a></li><li><span aria-current="page">Lot <%= l.lot_no %></span></li>
+  </ol>
+
+  <div class="lot-page-head">
+    <div class="row">
+      <span class="lot-no-chip">Lot <%= l.lot_no %> of <%= lotCount %></span>
+      <% if (live && open) { %><span class="tag tag-live">Live</span><% } else if (upcoming) { %><span class="tag tag-upcoming">Upcoming</span><% } else { %><span class="tag">Closed</span><% } %>
+    </div>
+    <h1><%= l.title %></h1>
+    <div class="row">
+      <span><%- I('scale', 16) %><%= fmtNum(l.quantity) %> <%= l.unit %></span>
+      <% if (a.category) { %><span><%- include('../partials/cat_icon', { category: a.category, size: 16 }) %><%= a.category %></span><% } %>
+      <% if (a.location) { %><span><%- I('pin', 16) %><%= a.location %></span><% } %>
+      <% if (a.seller_name) { %><span><%- I('factory', 16) %><%= a.seller_name %></span><% } %>
+    </div>
+  </div>
+
+  <div class="lot-layout">
+    <div class="lot-main">
+      <div class="gallery" data-gallery>
+        <% if (images.length) { %>
+          <button type="button" class="gallery-main js-gallery-open" aria-label="Open photo 1 of <%= images.length %> full screen">
+            <img class="js-gallery-img" src="/media/<%= images[0].file_id %>" alt="Lot <%= l.lot_no %>, photo 1 of <%= images.length %>" width="<%= images[0].width || 1200 %>" height="<%= images[0].height || 900 %>">
+            <span class="zoom"><%- I('expand', 15) %>View full screen</span>
+          </button>
+          <% if (images.length > 1) { %>
+            <div class="gallery-thumbs" role="group" aria-label="Photos">
+              <% images.forEach(function (im, i) { %>
+                <button type="button" data-index="<%= i %>" data-full="/media/<%= im.file_id %>" data-w="<%= im.width || '' %>" data-h="<%= im.height || '' %>" aria-label="Show photo <%= i + 1 %> of <%= images.length %>" aria-current="<%= i === 0 ? 'true' : 'false' %>">
+                  <img src="/media/<%= im.file_id %>?size=thumb" alt="" loading="lazy" width="160" height="120">
+                </button>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <span class="hide" data-index="0" data-full="/media/<%= images[0].file_id %>"></span>
+          <% } %>
+          <dialog class="lightbox" aria-label="Lot <%= l.lot_no %> photos">
+            <div class="lb-top"><span class="js-lb-count">Photo 1 of <%= images.length %></span><button type="button" class="lb-btn js-lb-close" aria-label="Close"><%- I('close', 22) %></button></div>
+            <div class="lb-stage">
+              <button type="button" class="lb-btn js-lb-prev" aria-label="Previous photo" <%= images.length < 2 ? 'hidden' : '' %>><%- I('chevron-left', 24) %></button>
+              <img class="js-lb-img" src="" alt="">
+              <button type="button" class="lb-btn js-lb-next" aria-label="Next photo" <%= images.length < 2 ? 'hidden' : '' %>><%- I('chevron-right', 24) %></button>
+            </div>
+            <div class="lb-cap">Lot <%= l.lot_no %>: <%= l.title %>. Use the arrow keys to move between photos and Escape to close.</div>
+          </dialog>
+        <% } else { %>
+          <div class="gallery-main no-photo" style="cursor:default"><%- include('../partials/ph', { category: a.category, sub: 'Lot ' + l.lot_no + ', ' + fmtNum(l.quantity) + ' ' + l.unit, iconSize: 56 }) %></div>
+          <p class="gallery-none"><%- I('info', 15) %>The seller has not added photos for this lot. Inspect it at the site during the inspection window.</p>
+        <% } %>
+      </div>
+
+      <% if (specs.length) { %>
+        <section class="a-section">
+          <h2><%- I('clipboard', 22) %>Specifications</h2>
+          <div class="table-wrap">
+            <table class="specs">
+              <tbody>
+                <tr><th scope="row">Quantity</th><td class="tnum"><%= fmtNum(l.quantity) %> <%= l.unit %></td></tr>
+                <% specs.forEach(function (s) { %><tr><th scope="row"><%= s.label %></th><td><%= s.value %></td></tr><% }) %>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      <% } %>
+
+      <section class="a-section">
+        <h2><%- I('info', 22) %>Description</h2>
+        <div class="panel"><div class="panel-body">
+          <% if (rich(l.description)) { %><div class="rich"><%- rich(l.description) %></div>
+          <% } else { %><p class="muted">No description has been added for this lot. See the auction's <a href="/auctions/<%= a.id %>#about">details</a> and <a href="/auctions/<%= a.id %>#inspection">inspection arrangements</a>.</p><% } %>
+        </div></div>
+      </section>
+
+      <% if (rich(a.inspection)) { %>
+        <section class="a-section">
+          <h2><%- I('eye', 22) %>Inspection</h2>
+          <div class="panel"><div class="panel-body"><div class="rich"><%- rich(a.inspection) %></div></div></div>
+        </section>
+      <% } %>
+    </div>
+
+    <aside class="lot-aside">
+      <div data-room data-auction="<%= a.id %>" data-phase="<%= phase %>" data-starts="<%= state.startsAt %>" data-user="<%= user ? 1 : 0 %>" data-can-bid="<%= canBid ? 1 : 0 %>">
+        <div class="bid-panel <%= panelClass %>" data-lot="<%= l.id %>" data-lot-no="<%= l.lot_no %>" data-unit="<%= l.unit %>" data-status="<%= l.status %>" data-ends="<%= l.endsAt %>" data-increment="<%= l.increment %>">
+          <div class="bp-top">
+            <div class="js-close"><div>
+              <% if (open && live) { %>
+                <span>Lot closes in</span><b class="countdown" data-countdown="<%= l.endsAt %>" data-done="Closing"></b><span class="sub">at <%= fmtTime(new Date(l.endsAt)) %>, <%= fmtDate(new Date(l.endsAt)) %></span>
+              <% } else if (open) { %>
+                <span>Bidding opens in</span><b class="countdown" data-countdown="<%= state.startsAt %>" data-done="Starting"></b><span class="sub">Lot closes <%= fmtDT(new Date(l.endsAt)) %></span>
+              <% } else { %>
+                <span>Closed</span><b class="when-text"><%= fmtDT(new Date(l.endsAt)) %></b>
+              <% } %>
+            </div></div>
+            <span class="tag js-live-tag <%= live && open ? 'tag-live' : 'tag-dark' %>"><%= live && open ? 'Live' : upcoming ? 'Upcoming' : 'Closed' %></span>
+          </div>
+          <div class="bp-high js-high"><span class="lbl">Current highest bid</span><div>
+            <% if (l.highest !== null && l.highest !== undefined) { %><span class="price"><%= fmtINR(l.highest) %></span>
+            <% } else if (l.bids > 0) { %><span class="muted">Hidden</span>
+            <% } else { %><span class="muted">No bids yet</span><% } %>
+            <span class="sub"><%= plural(l.bids, 'bid') %></span>
+          </div></div>
+          <div class="bp-figs">
+            <div><span>Start price</span><b><%= fmtINR(l.start_price) %></b> <span>per <%= l.unit %></span></div>
+            <div><span>Bid increment</span><b><%= fmtINR(l.increment) %></b></div>
+          </div>
+          <div class="bp-act">
+            <div class="js-standing standing <%= !mine ? '' : !open ? 'done' : l.leading ? 'lead' : 'out' %>"><%
+              if (mine) {
+                if (!open) { %>Your highest bid <%= fmtINR(l.myBid) %><% }
+                else if (l.leading) { %>Leading with <%= fmtINR(l.myBid) %><% }
+                else { %>Outbid. Your bid <%= fmtINR(l.myBid) %><% }
+              } %></div>
+            <div class="js-action">
+              <% if (!open) { %>
+                <span class="tag <%= r[1] %>"><%= r[0] %></span>
+              <% } else if (upcoming) { %>
+                <p class="muted small" style="margin:0">Bidding opens <%= fmtTime(a.starts_at) %>, <%= fmtDate(a.starts_at) %>. This page updates by itself when it does.</p>
+              <% } else if (canBid) { %>
+                <form class="bid-form" method="post" action="/lots/<%= l.id %>/bid" data-lot="<%= l.id %>">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <label class="sr" for="bid-<%= l.id %>">Your bid for lot <%= l.lot_no %>, rupees per <%= l.unit %></label>
+                  <div class="amount"><input type="number" id="bid-<%= l.id %>" name="amount" inputmode="decimal" step="any" min="0" value="<%= l.minBid %>" autocomplete="off"></div>
+                  <div class="quick-steps" role="group" aria-label="Add to the current highest bid">
+                    <% [1, 2, 5].forEach(function (n) { %><button type="button" data-step="<%= n %>" title="Current highest plus <%= n %> increment<%= n > 1 ? 's' : '' %>">+<%= fmtINR(n * l.increment) %></button><% }) %>
+                  </div>
+                  <button class="btn btn-accent" type="submit">Place bid</button>
+                </form>
+                <div class="bid-confirm hide" role="group" aria-label="Confirm your bid"></div>
+                <div class="bid-msg" aria-live="polite" data-min="<%= l.minBid %>">Minimum <%= fmtINR(l.minBid) %> per <%= l.unit %></div>
+              <% } else if (user) { %>
+                <p class="small" style="margin:0 0 10px">Complete your registration to bid on this lot.</p>
+                <a class="btn btn-block" href="/account">Go to my account</a>
+              <% } else { %>
+                <a class="btn btn-accent btn-block" href="<%= loginHref %>">Sign in to bid</a>
+                <% if (S.registration_open === '1') { %><p class="small muted" style="margin:10px 0 0">No account yet? <a href="/register">Register your company</a>.</p><% } %>
+              <% } %>
+            </div>
+            <p class="bp-note">Bids are per <%= l.unit %>, excluding GST. <% if (a.extend_by_min > 0 && a.extend_window_min > 0) { %>A bid in the last <%= plural(a.extend_window_min, 'minute') %> extends this lot by <%= plural(a.extend_by_min, 'minute') %>.<% } %><% if (!a.show_highest_bid) { %> The highest bid is hidden in this auction.<% } %></p>
+          </div>
+        </div>
+      </div>
+        <% if (live || upcoming) { %><div class="conn-line" id="rb-conn"><span class="dot" aria-hidden="true"></span><span id="rb-conn-text">Connecting</span><span class="muted">Server time <b id="rb-clock" class="tnum"><%= fmtTime(new Date(serverNow)) %></b> IST</span></div><% } %>
+
+      <div class="panel">
+        <div class="panel-head"><h3><%- I('gavel') %>Auction</h3><a class="small" href="/auctions/<%= a.id %>">All <%= lotCount %> lots</a></div>
+        <div class="panel-body">
+          <p style="font-weight:600;margin-bottom:12px"><a href="/auctions/<%= a.id %>" style="color:inherit"><%= a.title %></a></p>
+          <dl class="kv small">
+            <dt>Starts</dt><dd><%= fmtDT(a.starts_at) %></dd>
+            <dt><%= a.stagger_min > 0 ? 'First lot closes' : 'Ends' %></dt><dd><%= fmtDT(a.ends_at) %></dd>
+            <% if (a.seller_name) { %><dt>Seller</dt><dd><%= a.seller_name %></dd><% } %>
+          </dl>
+          <% if (rich(a.terms) || documents.length) { %>
+            <ul class="doc-list" style="margin-top:12px">
+              <% if (rich(a.terms)) { %><li><a href="/auctions/<%= a.id %>#terms"><span class="d-ico"><%- I('doc', 18) %></span><span><b>Terms of sale</b><span>Payment, lifting and taxes</span></span></a></li><% } %>
+              <% documents.forEach(function (d) { %><li><a href="/media/<%= d.file_id %>" target="_blank" rel="noopener"><span class="d-ico"><%- I(d.mime === 'application/pdf' ? 'doc' : 'image', 18) %></span><span><b><%= d.title %></b><span><%= d.mime === 'application/pdf' ? 'PDF' : 'Image' %>, <%= kb(d.size) %></span></span></a></li><% }) %>
+            </ul>
+          <% } %>
+        </div>
+      </div>
+
+      <% if (prev || next) { %>
+        <nav class="lot-nav" aria-label="Other lots">
+          <% if (prev) { %><a href="/auctions/<%= a.id %>/lots/<%= prev.id %>"><%- I('chevron-left') %><span><small>Previous, lot <%= prev.lot_no %></small><b><%= prev.title %></b></span></a><% } %>
+          <% if (next) { %><a class="next" href="/auctions/<%= a.id %>/lots/<%= next.id %>"><span><small>Next, lot <%= next.lot_no %></small><b><%= next.title %></b></span><%- I('chevron-right') %></a><% } %>
+        </nav>
+      <% } %>
+    </aside>
+  </div>
+</div>

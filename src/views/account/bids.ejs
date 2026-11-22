@@ -1,9 +1,9 @@
 <div class="wrap" data-server-now="<%= Date.now() %>">
+  <%- include('_nav') %>
   <div class="page-head">
     <h1>My bids</h1>
     <p>Every lot you have bid on, with your highest bid. Open lots are listed first.</p>
   </div>
-  <%- include('_nav') %>
   <% if (!lots.length) { %>
     <div class="table-wrap"><div class="empty"><h3>You have not placed any bids yet</h3><p>Find a live or upcoming auction on the <a href="/auctions">auction schedule</a>.</p></div></div>
   <% } else { %>
@@ -13,7 +13,7 @@
         <tbody>
           <% lots.forEach(function (l) { var open = l.status === 'open' && l.auction_status === 'published'; %>
             <tr>
-              <td class="cell-main"><span class="primary">Lot <%= l.lot_no %>: <%= l.title %></span></td>
+              <td class="cell-main"><% if (l.auction_status === 'published') { %><a class="primary" href="/auctions/<%= l.auction_id %>/lots/<%= l.id %>">Lot <%= l.lot_no %>: <%= l.title %></a><% } else { %><span class="primary">Lot <%= l.lot_no %>: <%= l.title %></span><% } %></td>
               <td data-label="Auction"><a href="/auctions/<%= l.auction_id %>"><%= l.auction_title %></a></td>
               <td class="num" data-label="Your highest bid"><%= fmtINR(l.my_amount) %><span class="sub">per <%= l.unit %></span></td>
               <td data-label="Standing"><span class="tag <%= l.tone %>"><%= l.standing %></span></td>

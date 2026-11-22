@@ -6,6 +6,14 @@
   <a class="btn btn-quiet" href="/<%= p.slug %>" target="_blank" rel="noopener">View on site</a>
 </div>
 
+<% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. The page was not saved.</div><% } %>
+<% if (notes.length) { %>
+  <div class="notice notice-warn">
+    <p>This page contains a hidden note that bidders do not see. It is removed when you save the page:</p>
+    <% notes.forEach(function (n) { %><p class="small"><%= n %></p><% }) %>
+  </div>
+<% } %>
+
 <form method="post" action="/admin/pages/<%= encodeURIComponent(p.slug) %>" class="panel" novalidate>
   <div class="panel-body">
     <%- include('_csrf') %>
@@ -15,9 +23,10 @@
       <%- include('_err', { k: 'title' }) %>
     </div>
     <div class="field">
-      <label for="body">Page content (HTML)</label>
-      <textarea id="body" name="body" class="code-area code-area-tall" spellcheck="false"><%= v.body %></textarea>
-      <div class="hint">Use simple tags: &lt;h2&gt; and &lt;h3&gt; for headings, &lt;p&gt; for paragraphs, &lt;ul&gt;/&lt;ol&gt; with &lt;li&gt; for lists, &lt;b&gt;, &lt;a href=""&gt; and &lt;br&gt;. The page title is shown above the content, so do not repeat it as a heading. The content is published exactly as written.</div>
+      <label for="body" id="body-label">Page content</label>
+      <textarea id="body" name="body" class="code-area code-area-tall" spellcheck="false" data-rich data-rich-source data-rich-tall data-label-id="body-label"><%= v.body %></textarea>
+      <%- include('_err', { k: 'body' }) %>
+      <div class="hint">The page title is shown above the content, so do not repeat it as a heading. Use "Heading 2" for sections and "Heading 3" below them. Scripts, styles and embedded media are removed when you save.</div>
     </div>
     <div class="form-actions">
       <button class="btn" type="submit">Save page</button>

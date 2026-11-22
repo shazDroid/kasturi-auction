@@ -55,9 +55,17 @@
   </div>
 </div>
 
-<div class="panel">
+<div class="panel ax-overview">
   <div class="panel-head"><h3>Summary</h3><span class="muted small">Times are IST</span></div>
-  <div class="panel-body cols-even">
+  <div class="panel-body ax-overview-body">
+    <div class="ax-overview-cover">
+      <% if (a.cover_id) { %>
+        <a href="/media/<%= a.cover_id %>" target="_blank" rel="noopener"><img src="/media/<%= a.cover_id %>?size=thumb" alt="Cover photo of this auction" width="320" height="240"></a>
+        <a class="small" href="/admin/auctions/<%= a.id %>/edit">Change cover photo</a>
+      <% } else { %>
+        <a class="ax-cover-empty" href="/admin/auctions/<%= a.id %>/edit"><span>No cover photo</span><span class="small">Add one on the edit page</span></a>
+      <% } %>
+    </div>
     <dl class="kv">
       <dt>Status</dt><dd><%- tag('status', a.status) %></dd>
       <dt>Bidding opens</dt><dd><%= fmtDT(a.starts_at) %></dd>
@@ -74,7 +82,52 @@
       <dt>Announced</dt><dd><%= a.announced_at ? fmtDT(a.announced_at) : 'Not yet' %></dd>
       <dt>Reminder email</dt><dd><%= a.reminder_sent ? 'Sent' : (S.reminder_minutes_before !== '0' ? 'Sent ' + S.reminder_minutes_before + ' min before start' : 'Turned off in settings') %></dd>
       <dt>Public page</dt><dd><% if (a.status === 'published') { %><a href="/auctions/<%= a.id %>" target="_blank" rel="noopener">Open auction page</a><% } else { %><span class="muted">Visible after publishing</span><% } %></dd>
+      <dt>Description</dt><dd><%= a.description ? excerpt(a.description, 90) : 'Not written yet' %></dd>
     </dl>
+  </div>
+</div>
+
+<div class="panel" id="documents">
+  <div class="panel-head"><h3>Documents</h3><span class="muted small">Inspection reports, lot lists, layout drawings or the full terms, as PDF or image. Up to <%= MAX_DOCS %>.</span></div>
+  <div class="panel-body">
+    <% if (docs.length) { %>
+      <div class="table-wrap flat">
+        <table class="table">
+          <thead><tr><th>Title</th><th>File</th><th>Added</th><th></th></tr></thead>
+          <tbody>
+          <% docs.forEach(function (d) { %>
+            <tr>
+              <td class="cell-main"><a class="primary" href="/media/<%= d.file_id %>" target="_blank" rel="noopener"><%= d.title %></a></td>
+              <td><%= d.filename %><span class="sub"><%= d.mime === 'application/pdf' ? 'PDF' : 'Image' %>, <%= fmtSize(d.size) %></span></td>
+              <td class="nowrap"><%= fmtDT(d.created_at) %></td>
+              <td class="actions">
+                <a href="/media/<%= d.file_id %>" target="_blank" rel="noopener">Open</a>
+                <form method="post" action="/admin/auctions/<%= a.id %>/documents/<%= d.id %>/delete" class="inline-form"><%- include('_csrf') %>
+                  <button class="linkbtn danger" type="submit" data-confirm="Remove &quot;<%= d.title %>&quot;? Bidders will no longer be able to open it.">Remove</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <p class="muted">No documents yet. Bidders see uploaded documents on the auction page once it is published.</p>
+    <% } %>
+    <% if (docs.length < MAX_DOCS) { %>
+    <form method="post" enctype="multipart/form-data" action="/admin/auctions/<%= a.id %>/documents?_csrf=<%= csrf %>" class="ax-doc-form">
+      <div class="field">
+        <label for="doc-title">Title</label>
+        <input type="text" id="doc-title" name="title" maxlength="200" placeholder="For example Inspection report, 18 Nov">
+      </div>
+      <div class="field">
+        <label for="doc-file">File</label>
+        <input type="file" id="doc-file" name="file" accept="application/pdf,image/jpeg,image/png,image/webp" required>
+      </div>
+      <div class="field"><button class="btn btn-sm" type="submit">Upload document</button></div>
+    </form>
+    <p class="hint muted small">PDF, JPG, PNG or WebP, up to 8 MB. If you leave the title empty, the file name is used.</p>
+    <% } %>
   </div>
 </div>
 

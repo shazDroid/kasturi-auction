@@ -1,0 +1,33 @@
+<%# Auction card. Expects `a` (row from boardRow). %><%
+var live = a.phase === 'live', up = a.phase === 'upcoming';
+var lotsTxt = a.lot_count + (a.lot_count === 1 ? ' lot' : ' lots');
+%><article class="a-card<%= live ? ' is-live' : '' %>">
+  <div class="media">
+    <div class="badges">
+      <% if (live) { %><span class="tag tag-live">Live</span><% } else if (up) { %><span class="tag tag-upcoming">Upcoming</span><% } else { %><span class="tag">Closed</span><% } %>
+    </div>
+    <% if (a.cover_id) { %>
+      <img src="/media/<%= a.cover_id %>?size=thumb" alt="" loading="lazy" width="640" height="400">
+    <% } else { %>
+      <%- include('../partials/ph', { category: a.category, sub: lotsTxt + (a.location ? ', ' + a.location.split(',').slice(-2).join(',').trim() : '') }) %>
+    <% } %>
+  </div>
+  <div class="body">
+    <% if (a.category) { %><div class="cat"><%- include('../partials/cat_icon', { category: a.category, size: 16 }) %><%= a.category %></div><% } %>
+    <h3><a href="/auctions/<%= a.id %>"><%= a.title %></a></h3>
+    <ul class="meta">
+      <% if (a.seller_name) { %><li><%- include('../partials/icon', { name: 'factory', size: 17 }) %><span><%= a.seller_name %></span></li><% } %>
+      <% if (a.location) { %><li><%- include('../partials/icon', { name: 'pin', size: 17 }) %><span><%= a.location %></span></li><% } %>
+      <li><%- include('../partials/icon', { name: 'calendar', size: 17 }) %><span class="tnum"><%= a.weekday %> <%= a.dayNum %> <%= a.month %>, <%= a.window %></span></li>
+      <li><%- include('../partials/icon', { name: 'package', size: 17 }) %><span><%= lotsTxt %></span></li>
+    </ul>
+  </div>
+  <div class="foot">
+    <div class="when">
+      <% if (live) { %><span>Closes in</span><b class="countdown" data-countdown="<%= a.closeAt %>" data-done="Closing"></b>
+      <% } else if (up) { %><span>Starts in</span><b class="countdown" data-countdown="<%= a.startAt %>" data-done="Starting"></b>
+      <% } else { %><span>Closed on</span><b class="tnum"><%= fmtDate(a.closed_at || a.ends_at) %></b><% } %>
+    </div>
+    <a class="btn btn-sm <%= live ? 'btn-accent' : 'btn-quiet' %>" href="/auctions/<%= a.id %>" tabindex="-1" aria-hidden="true"><%= live ? 'Bid now' : up ? 'View lots' : 'View results' %></a>
+  </div>
+</article>

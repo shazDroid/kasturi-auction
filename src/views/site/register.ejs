@@ -1,10 +1,15 @@
-<div class="wrap mid">
+<%
+  var I = function (n, size) { return include('../partials/icon', { name: n, size: size || 16 }); };
+  var tel = S.contact_phone ? S.contact_phone.replace(/[^\d+]/g, '') : '';
+%>
+<section class="auth">
+<div class="wrap">
 <% if (!open) { %>
-  <div class="page-head">
-    <h1>Registrations are closed</h1>
-    <p>We are not accepting new bidder accounts at the moment.</p>
-  </div>
-  <div class="panel"><div class="panel-body">
+<div class="auth-card"><div class="ac-body">
+  <div class="ac-mark"><%- include('../partials/mark', { size: 40 }) %></div>
+  <h1>Registrations are closed</h1>
+  <p class="ac-lead">We are not accepting new bidder accounts at the moment.</p>
+  <div>
     <p>To register your company as a bidder, contact us and we will set up your account.</p>
     <dl class="kv">
       <dt>Email</dt><dd><a href="mailto:<%= S.contact_email %>"><%= S.contact_email %></a></dd>
@@ -12,16 +17,19 @@
       <% if (S.support_hours) { %><dt>Hours</dt><dd><%= S.support_hours %></dd><% } %>
     </dl>
     <div class="form-actions"><a class="btn btn-quiet" href="/contact">Send us a message</a> <a href="/login">I already have an account</a></div>
-  </div></div>
-<% } else { %>
-  <div class="page-head">
-    <h1>Register as a bidder</h1>
-    <p>Create an account for your company. After this you verify your email<% if (S.require_kyc_approval === '1') { %>, upload your business documents<% } %><% if (S.fee_enabled === '1') { %> and pay the registration fee<% } %> before you can bid.</p>
   </div>
+</div></div>
+<% } else { %>
+<div class="auth-card wide">
+<div class="ac-body">
+  <div class="ac-mark"><%- include('../partials/mark', { size: 40 }) %></div>
+  <h1>Register as a bidder</h1>
+    <p class="ac-lead">Create an account for your company. After this you verify your email<% if (S.require_kyc_approval === '1') { %>, upload your business documents<% } %><% if (S.fee_enabled === '1') { %> and pay the registration fee<% } %> before you can bid.</p>
+  <%- include('../partials/flash') %>
   <% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Some details need fixing. Check the fields marked below.</div><% } %>
-  <form class="panel" method="post" action="/register" novalidate>
+  <form method="post" action="/register" novalidate>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
-    <div class="panel-body">
+    <div>
       <fieldset>
         <legend>Your details</legend>
         <div class="form-grid">
@@ -83,10 +91,27 @@
         </div>
       </div>
       <div class="form-actions">
-        <button class="btn btn-accent" type="submit">Create account</button>
+        <button class="btn btn-accent btn-lg" type="submit">Create account</button>
         <span class="muted">Already registered? <a href="/login">Sign in</a></span>
       </div>
     </div>
   </form>
+</div>
+<aside class="ac-side">
+  <h2>What happens after you register</h2>
+  <ol>
+    <% if (S.require_email_verification === '1') { %><li><span><b>Confirm your email</b>We send a link to your work email. Open it to activate the account.</span></li><% } %>
+    <% if (S.require_kyc_approval === '1') { %><li><span><b>Upload business documents</b><%= (S.required_documents || 'GST certificate, PAN card, Address proof') %>. Our team checks them, usually within one working day.</span></li><% } %>
+    <% if (S.fee_enabled === '1') { %><li><span><b>Pay the registration fee</b>Online by UPI, card or net banking. A GST receipt is emailed to you.</span></li><% } %>
+    <li><span><b>Bid in any live auction</b>Your bidder number is shown in your account. Quote it when you call us.</span></li>
+  </ol>
+  <div class="ac-help">
+    <span>Questions about registering?</span>
+    <% if (S.contact_phone) { %><a href="tel:<%= tel %>"><%- I('phone') %><%= S.contact_phone %></a><% } %>
+    <a href="mailto:<%= S.contact_email %>"><%- I('mail') %><%= S.contact_email %></a>
+  </div>
+</aside>
+</div>
 <% } %>
 </div>
+</section>

@@ -1,0 +1,9 @@
+<%# Material category -> icon. Usage: include('../partials/cat_icon', { category: 'Ferrous scrap', size: 28 }) %><%
+var c = String(locals.category || '').toLowerCase();
+var n = /non[\s-]?ferrous|copper|alumin|brass|zinc|lead|cable/.test(c) ? 'nonferrous'
+  : /ferrous|steel|iron|\bms\b|cast/.test(c) ? 'ferrous'
+  : /machin|equipment|plant|vehicle/.test(c) ? 'machinery'
+  : /e-?waste|batter|electr|transformer/.test(c) ? 'ewaste'
+  : /plastic|rubber|polymer|pet\b/.test(c) ? 'plastics'
+  : /mixed|general|other/.test(c) ? 'mixed' : 'package';
+%><%- include('icon', { name: n, size: locals.size || 20, cls: locals.cls }) %>

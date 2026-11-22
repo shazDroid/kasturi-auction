@@ -4,7 +4,8 @@
  *
  *   - default email templates and CMS pages
  *   - the first super admin (from ADMIN_EMAIL / ADMIN_PASSWORD)
- *   - optional demo data when SEED_DEMO=true and there are no auctions yet
+ *   - optional demo data when SEED_DEMO=true and there are no auctions yet, and a one-time upgrade of
+ *     older demo rows to formatted text and specifications
  */
 const bcrypt = require('bcryptjs');
 const db = require('./db');
@@ -360,6 +361,230 @@ const BIDDERS = [
 ];
 const PENDING_BIDDER = ['Harpreet Singh', 'Guru Kirpa Enterprises', 'Trader', 'Mandi Gobindgarh', 'Punjab', '03', '147301', 'DLMPS3870H', '+91 98728 40916', 'GT Road, Mandi Gobindgarh'];
 
+// ---------------------------------------------------------------------------------------------
+// v2 demo content: editor-style HTML for descriptions, inspection and terms, plus lot specifications.
+// Used for a fresh demo seed, and once to upgrade demo rows created before v2 (see upgradeDemo).
+
+/** specs('Grade: EN8', 'Form: Bundles') -> [{ label, value }] */
+const specs = (...pairs) => pairs.map((p) => { const i = p.indexOf(': '); return { label: p.slice(0, i), value: p.slice(i + 2) }; });
+
+const TERMS_HTML = {
+  steel: `<h2>Price and taxes</h2>
+<p>Prices are per MT, exclusive of GST and TCS, which will be charged as applicable.</p>
+<h2>Payment</h2>
+<ul>
+<li>25% of the estimated value within 3 working days of the award.</li>
+<li>Balance before lifting each consignment.</li>
+<li>By RTGS or NEFT to the seller's account only. Cash and cheques are not accepted.</li>
+</ul>
+<h2>Lifting and weighment</h2>
+<ul>
+<li>Lifting within 15 days of the award, 9 am to 5 pm on working days.</li>
+<li>Weighment on the seller's weighbridge is final.</li>
+<li>The buyer arranges loading labour, vehicles and gas cutting where needed.</li>
+</ul>
+<h3>Site safety</h3>
+<p>Vehicles must carry valid papers. Drivers and labour must wear safety shoes and helmets and follow the plant safety rules at all times.</p>`,
+  nonferrous: `<h2>Price and taxes</h2>
+<p>Prices are per unit stated for each lot, exclusive of GST and TCS.</p>
+<h2>Payment</h2>
+<p>Full payment within 5 working days of the award, by RTGS or NEFT to the seller. Material is released only after the payment is credited.</p>
+<h2>Lifting and weighment</h2>
+<ul>
+<li>Lifting within 10 days of payment.</li>
+<li>Weighment on the seller's weighbridge in the presence of the buyer's representative.</li>
+<li>Wooden and HDPE drums are counted at the time of loading.</li>
+</ul>
+<p>Copper and aluminium scrap is sold on actual weight including insulation, as is where is.</p>`,
+  machine: `<h2>Price and taxes</h2>
+<p>Prices are per number or per lot as stated, exclusive of GST and TCS.</p>
+<h2>Payment</h2>
+<p>Full payment within 7 working days of the award.</p>
+<h2>Condition</h2>
+<p>Machines are sold <strong>as is, where is</strong>, with no warranty of working condition. Inspect before bidding.</p>
+<h2>Dismantling and removal</h2>
+<ul>
+<li>The buyer dismantles, loads and removes the machines at their own cost and risk within 21 days of payment.</li>
+<li>A competent rigging crew is required, with the buyer's own crane where needed.</li>
+<li>Foundations and cabling stay with the seller unless the lot says otherwise.</li>
+</ul>`,
+  battery: `<h2>Price and taxes</h2>
+<p>Prices are per KG or per number as stated, exclusive of GST and TCS.</p>
+<h2>Eligibility for battery lots</h2>
+<p>Used lead-acid batteries are sold only to bidders registered as a recycler or dealer under the <em>Battery Waste Management Rules, 2022</em>. Submit a copy of the registration before lifting.</p>
+<h2>Payment and lifting</h2>
+<ul>
+<li>Full payment within 5 working days of the award.</li>
+<li>Lifting within 15 days, with spill-proof vehicles for batteries.</li>
+<li>Transformers are drained of oil before sale.</li>
+</ul>`,
+};
+
+const inspectionHtml = (when, contact, extra) => `<ul>
+<li><strong>When:</strong> ${when}</li>
+<li><strong>Contact:</strong> ${contact}</li>
+${extra.map((x) => `<li>${x}</li>`).join('\n')}
+</ul>`;
+
+// Keyed by the demo auction key; lots in the same order as AUCTIONS[].lots.
+const RICH = {
+  live1: {
+    description: `<p>Monthly sale of process scrap from a closed-die forging and machining plant supplying automotive and tractor components.</p>
+<h2>Storage and condition</h2>
+<ul>
+<li>All material is stored under a shed in separate heaps, one heap per lot.</li>
+<li>Free from oil sludge unless the lot says otherwise.</li>
+<li>Quantities are estimates; billing follows actual weighment.</li>
+</ul>`,
+    inspection: inspectionHtml('Working days, 10 am to 4 pm, until the day before the auction.', 'Manoj Arora, +91 98140 11223. Book a slot in advance.', ['Carry your company ID and wear safety shoes.']),
+    lots: [
+      [`<p>Hot-rolled coil heads and tails from the slitting line. Clean material with no coating or paint.</p>
+<ul><li>Mixed widths up to 1250 mm</li><li>Stacked by thickness in two heaps</li></ul>`,
+        specs('Grade: IS 2062 E250', 'Thickness: 2 to 8 mm', 'Form: Coil end cuttings', 'Condition: Clean, uncoated', 'Packing: Loose', 'Loading: By buyer, magnet crane available')],
+      [`<p>Cold-rolled sheet offcuts from the blanking presses, baled in bundles of about 1 MT. Suitable for direct charging.</p>`,
+        specs('Grade: CRCA IS 513', 'Thickness: 0.8 to 2 mm', 'Form: Baled bundles, about 1 MT each', 'Condition: Clean, light oil film', 'Packing: Bundles', 'Loading: Forklift by seller')],
+      [`<p>Mild steel turnings and borings from CNC machining, collected in bins at each cell.</p>
+<p>Light coolant traces are present; the material is drained before sale.</p>`,
+        specs('Grade: Mild steel, EN8 and EN9', 'Form: Turnings and borings', 'Condition: Drained, light coolant traces', 'Packing: Bins, tipped at loading', 'Loading: By buyer with JCB')],
+      [`<p>Trimming flash, end bits and rejected forgings in alloy steel. Grades are kept separate in marked heaps.</p>
+<ul><li>EN8 and EN19 heap</li><li>20MnCr5 heap</li></ul>`,
+        specs('Grade: EN8, EN19, 20MnCr5', 'Size: Up to 400 mm', 'Form: Flash, end pieces and rejects', 'Condition: Dry, some scale', 'Packing: Loose heaps', 'Loading: By buyer')],
+      [`<p>Worn-out hot-work die blocks taken out of service. Single pieces, some with lifting holes.</p>`,
+        specs('Grade: H11 and DB6', 'Size: Single pieces up to 1.2 MT', 'Condition: Worn, cracked faces', 'Packing: Loose on pallets', 'Loading: 5 tonne EOT crane by seller')],
+    ],
+  },
+  live2: {
+    description: `<p>Production scrap from a power and control cable plant. Copper and aluminium lots are bagged on pallets inside the factory scrap yard; drums are stacked in the open yard.</p>
+<h2>Good to know</h2>
+<ul>
+<li>Sample stripping is allowed during inspection with permission.</li>
+<li>Recovery figures are the seller's estimates from past sales.</li>
+</ul>`,
+    inspection: inspectionHtml('Monday to Saturday, 10 am to 5 pm.', 'Sunil Deshmukh, +91 98220 44871.', ['Sample stripping allowed with permission.']),
+    lots: [
+      [`<p>Multi-core copper cable offcuts from the laying-up and sheathing lines, PVC insulated.</p>`,
+        specs('Size: 1.5 to 16 sq mm, multi-core', 'Form: Cable offcuts', 'Condition: PVC insulated', 'Recovery: Copper about 60 to 65%', 'Packing: Jumbo bags on pallets', 'Loading: Forklift by seller')],
+      [`<p>Armoured copper power cable ends left on drums after cutting to customer lengths.</p>
+<ul><li>Steel wire armour, PVC sheathed</li><li>Lengths of 1 to 6 m</li></ul>`,
+        specs('Size: 25 to 240 sq mm', 'Form: Drum ends', 'Condition: Armoured, PVC sheathed', 'Packing: Loose on pallets', 'Loading: Forklift by seller')],
+      [`<p>EC grade aluminium rod, coil ends and rejects from the drawing section. Bare and clean.</p>`,
+        specs('Grade: EC grade aluminium', 'Size: 9.5 mm rod', 'Form: Coil ends and rejects', 'Condition: Bare, clean', 'Packing: Coils', 'Loading: Forklift by seller')],
+      [`<p>Wooden cable drums returned from sites. Mixed condition: some reusable, some for repair or firewood.</p>`,
+        specs('Size: 1000 to 1800 mm flange', 'Condition: Mixed', 'Packing: Stacked in open yard', 'Loading: By buyer')],
+      [`<p>Empty blue HDPE drums previously used for compound and lubricant. Rinsed, with lids.</p>`,
+        specs('Size: 200 litre', 'Condition: Rinsed, with lids', 'Packing: Stacked on pallets', 'Loading: By buyer')],
+    ],
+  },
+  up1: {
+    description: `<p>Replaced machines and utilities from a plant modernisation at an aluminium die-casting unit.</p>
+<h2>Before you bid</h2>
+<ul>
+<li>Machines are disconnected and can be seen at their present locations in the plant.</li>
+<li>Running demonstrations are not possible.</li>
+<li>Manuals and service records are available for the generator and the compressor.</li>
+</ul>`,
+    inspection: inspectionHtml('The two working days before the auction, 10 am to 4 pm.', 'Rohit Kulkarni, +91 97300 65512.', ['Running demonstrations are not possible.']),
+    lots: [
+      [`<p>Silent-canopy diesel generator set with its control panel. Serviced regularly until it was replaced by a grid connection.</p>
+<ul><li>About 18,000 running hours</li><li>Last serviced in 2025</li></ul>`,
+        specs('Make: Kirloskar', 'Capacity: 250 kVA', 'Year: 2014', 'Running hours: About 18,000', 'Condition: Working when removed', 'Loading: By buyer, crane required')],
+      [`<p>2-axis CNC turning lathe with an 8-station turret. Spindle bearings were replaced 18 months ago.</p>`,
+        specs('Make: Ace Micromatic', 'Model: Jobber XL', 'Year: 2011', 'Size: 400 mm swing', 'Condition: Working when removed, Fanuc control', 'Loading: By buyer')],
+      [`<p>Oil-injected screw air compressor with air receiver and refrigerated dryer.</p>`,
+        specs('Make: Elgi', 'Capacity: 50 HP', 'Year: 2012', 'Condition: Working when removed', 'Loading: By buyer')],
+      [`<p>Single girder EOT crane with end carriages and pendant control. Gantry rails are not included.</p>`,
+        specs('Capacity: 5 tonne', 'Size: 12 m span', 'Condition: Dismantled, ready for lifting', 'Loading: By buyer, crane required')],
+      [`<p>About 40 induction motors from 2 to 30 kW, some with gearboxes. Sold as one lot.</p>`,
+        specs('Size: 2 to 30 kW', 'Condition: Mixed, untested', 'Packing: On pallets', 'Loading: Forklift by seller')],
+    ],
+  },
+  up2: {
+    description: `<p>Process scrap from aluminium die-casting and machining. Each grade is stored separately in jumbo bags.</p>
+<ul><li>Bags are weighed at loading.</li><li>Moisture figures are from the seller's last test.</li></ul>`,
+    inspection: inspectionHtml('Working days, 11 am to 4 pm.', 'Rohit Kulkarni, +91 97300 65512.', ['Carry your company ID.']),
+    lots: [
+      [`<p>Profile offcuts and rejects from the extrusion press, mill finish and anodised. No thermal break or plastic.</p>`,
+        specs('Grade: 6063', 'Form: Extrusion offcuts', 'Condition: Clean, no plastic', 'Packing: Jumbo bags', 'Loading: Forklift by seller')],
+      [`<p>Runners, overflows and rejected castings. Some rejected parts carry iron inserts.</p>`,
+        specs('Grade: ADC12', 'Form: Runners and rejected castings', 'Condition: Some iron inserts', 'Packing: Jumbo bags', 'Loading: Forklift by seller')],
+      [`<p>Dry aluminium turnings and chips from machining, centrifuged before bagging.</p>`,
+        specs('Form: Turnings and chips', 'Condition: Centrifuged, moisture under 2%', 'Packing: Jumbo bags', 'Loading: Forklift by seller')],
+      [`<p>Grey cast iron borings from brake drum machining, stored under a shed.</p>`,
+        specs('Grade: Grey cast iron', 'Form: Borings', 'Condition: Dry, under shed', 'Packing: Loose', 'Loading: By buyer with JCB')],
+    ],
+  },
+  up3: {
+    description: `<p>Material from the replacement of a UPS battery bank and two substations, and from the dismantling of an old cooling tower structure.</p>
+<h2>Important</h2>
+<ul>
+<li>Battery lots are only for registered recyclers and dealers. See the terms.</li>
+<li>Transformers are drained of oil before sale.</li>
+</ul>`,
+    inspection: inspectionHtml('Working days, 10 am to 4 pm.', 'Kalpesh Shah, +91 99250 30418.', ['Batteries are stacked on pallets in the stores yard.']),
+    lots: [
+      [`<p>Sealed maintenance-free and flooded cells from UPS banks. Flooded cells are drained of acid.</p>`,
+        specs('Form: 2 V and 12 V cells', 'Condition: Drained where flooded', 'Packing: Shrink-wrapped on pallets', 'Loading: Forklift by seller, spill-proof vehicle required')],
+      [`<p>Copper wound distribution transformers taken out of two substations. Oil drained.</p>`,
+        specs('Capacity: 500 kVA, 11 kV / 433 V', 'Year: 2004', 'Condition: Oil drained', 'Size: About 2.4 MT each', 'Loading: By buyer, crane required')],
+      [`<p>Pipes, sheets and fittings from water treatment lines. Magnet tested.</p>`,
+        specs('Grade: SS 304', 'Form: Pipes, sheets and fittings', 'Condition: Magnet tested', 'Packing: Loose', 'Loading: By buyer')],
+      [`<p>Beams, channels and angles from the dismantled cooling tower structure, already cut to length.</p>`,
+        specs('Form: Beams, channels and angles', 'Size: Cut to 1.5 m lengths', 'Condition: Painted, some rust', 'Packing: Loose', 'Loading: By buyer with crane')],
+    ],
+  },
+  closed1: {
+    description: `<p>Previous monthly sale of process scrap from the forging and machining plant.</p>`,
+    inspection: `<p>Inspection was available on working days before the auction.</p>`,
+    lots: [
+      [`<p>Mild steel turnings and borings from CNC machining.</p>`, specs('Grade: Mild steel', 'Form: Turnings and borings', 'Packing: Bins', 'Loading: By buyer')],
+      [`<p>Heavy melting scrap from plant maintenance, cut to furnace size.</p>`, specs('Grade: HMS 1 and 2 (80:20)', 'Size: Cut to furnace size', 'Packing: Loose', 'Loading: By buyer')],
+      [`<p>Alloy steel end cuttings and rejected forgings.</p>`, specs('Grade: EN8, EN19', 'Form: End cuttings and rejects', 'Packing: Loose', 'Loading: By buyer')],
+    ],
+  },
+  closed2: {
+    description: `<p>Previous sale of cable production scrap and packing material.</p>`,
+    inspection: `<p>Inspection was available on working days before the auction.</p>`,
+    lots: [
+      [`<p>Multi-core copper cable offcuts, PVC insulated.</p>`, specs('Form: Cable offcuts', 'Condition: PVC insulated', 'Packing: Jumbo bags', 'Loading: Forklift by seller')],
+      [`<p>Aluminium conductor XLPE cable offcuts.</p>`, specs('Size: 35 to 300 sq mm', 'Condition: XLPE insulated', 'Packing: Loose', 'Loading: By buyer')],
+      [`<p>Broken wooden drums for firewood or repair.</p>`, specs('Condition: Broken', 'Packing: Stacked', 'Loading: By buyer')],
+    ],
+  },
+};
+const TERMS_KEY = { live1: 'steel', closed1: 'steel', live2: 'nonferrous', up2: 'nonferrous', closed2: 'nonferrous', up1: 'machine', up3: 'battery' };
+
+/**
+ * One-time upgrade of demo rows created before v2 (SEED_DEMO=true only). A demo auction is
+ * recognised by its exact title and demo seller name; its text is replaced only while it is still
+ * plain text, and a lot only while its specs are empty and its description is plain text, so
+ * anything an admin has edited is left alone.
+ */
+async function upgradeDemo() {
+  if (process.env.SEED_DEMO !== 'true') return;
+  let n = 0;
+  for (const a of AUCTIONS) {
+    const r = RICH[a.key];
+    const row = await db.one(
+      `SELECT a.id FROM auctions a JOIN sellers s ON s.id = a.seller_id WHERE a.title = $1 AND s.name = $2 ORDER BY a.id LIMIT 1`,
+      [a.title, SELLERS[a.seller].name]);
+    if (!row) continue;
+    await db.query(
+      `UPDATE auctions SET description = CASE WHEN description NOT LIKE '<%' THEN $2 ELSE description END,
+                           inspection  = CASE WHEN inspection  NOT LIKE '<%' THEN $3 ELSE inspection END,
+                           terms       = CASE WHEN terms       NOT LIKE '<%' THEN $4 ELSE terms END
+        WHERE id = $1 AND (description NOT LIKE '<%' OR inspection NOT LIKE '<%' OR terms NOT LIKE '<%')`,
+      [row.id, r.description, r.inspection, TERMS_HTML[TERMS_KEY[a.key]]]);
+    for (let i = 0; i < a.lots.length; i++) {
+      const res = await db.query(
+        `UPDATE lots SET description = $3, specs = $4::jsonb
+          WHERE auction_id = $1 AND lot_no = $2 AND title = $5 AND specs = '[]'::jsonb AND description NOT LIKE '<%'`,
+        [row.id, i + 1, r.lots[i][0], JSON.stringify(r.lots[i][1]), a.lots[i][0]]);
+      n += res.rowCount;
+    }
+  }
+  if (n) console.log(`[seed] Upgraded ${n} demo lot(s) with formatted descriptions and specifications`);
+}
+
 /** Small deterministic random generator so demo data looks the same on every fresh seed. */
 function rng(seed) {
   let s = seed >>> 0;
@@ -460,17 +685,17 @@ async function seedDemo() {
         `INSERT INTO auctions(title, seller_id, category, location, description, inspection, terms, starts_at, ends_at, status,
                               extend_window_min, extend_by_min, reminder_sent, announced_at, created_at)
          VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,'published',3,3,$10,$11,$11) RETURNING id`,
-        [a.title, sellerIds[a.seller], a.category, a.location, a.description, a.inspection, a.terms, startsAt, endsAt,
+        [a.title, sellerIds[a.seller], a.category, a.location, RICH[a.key].description, RICH[a.key].inspection, TERMS_HTML[TERMS_KEY[a.key]], startsAt, endsAt,
           a.phase !== 'upcoming', new Date(Math.min(startsAt.getTime(), now) - 4 * DAY)]
       );
 
       for (let i = 0; i < a.lots.length; i++) {
-        const [title, description, quantity, unit, start, inc, reserve] = a.lots[i];
+        const [title, , quantity, unit, start, inc, reserve] = a.lots[i];
         const closed = a.phase === 'closed';
         const lot = await q(
-          `INSERT INTO lots(auction_id, lot_no, title, description, quantity, unit, start_price, increment, reserve_price, ends_at, status)
-           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-          [auction.id, i + 1, title, description, quantity, unit, start, inc, reserve, endsAt, closed ? 'closed' : 'open']
+          `INSERT INTO lots(auction_id, lot_no, title, description, quantity, unit, start_price, increment, reserve_price, ends_at, status, specs)
+           VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::jsonb) RETURNING id`,
+          [auction.id, i + 1, title, RICH[a.key].lots[i][0], quantity, unit, start, inc, reserve, endsAt, closed ? 'closed' : 'open', JSON.stringify(RICH[a.key].lots[i][1])]
         );
         const l = { id: lot.id, start, inc };
 
@@ -517,6 +742,7 @@ async function run() {
   await seedPages();
   await seedAdmin();
   await seedDemo();
+  await upgradeDemo();
 }
 
 module.exports = { run, PAGES };

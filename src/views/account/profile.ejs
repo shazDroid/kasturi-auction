@@ -2,11 +2,11 @@
   function fld(name) { return errors[name] ? 'aria-invalid="true"' : ''; }
 %>
 <div class="wrap">
+  <%- include('_nav') %>
   <div class="page-head">
     <h1>Business profile</h1>
     <p>These details appear on your fee receipt and are checked against your documents.</p>
   </div>
-  <%- include('_nav') %>
   <div class="mid">
     <% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Some details need fixing. Check the fields marked below.</div><% } %>
     <% if (locked) { %><div class="notice">Your documents are approved, so company name, GSTIN and PAN are locked. To change them, <a href="/contact">contact support</a>.</div><% } %>

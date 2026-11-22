@@ -1,9 +1,9 @@
 <div class="wrap" data-server-now="<%= serverNow %>">
-  <div class="page-head">
-    <h1><%= user.company_name || user.name %></h1>
-    <p>Bidder number <b><%= bidderNo %></b>. Quote it when you call or write to us.</p>
-  </div>
   <%- include('_nav') %>
+  <div class="page-head">
+    <h1>Account overview</h1>
+    <p>Your bidder number is <b><%= bidderNo %></b>. Quote it when you call or write to us.</p>
+  </div>
 
   <% if (user.kyc_status === 'rejected' && kycRequired) { %>
     <div class="notice notice-error" role="alert">
@@ -15,10 +15,12 @@
   <div class="cols">
     <div>
       <div class="panel">
+        <% var doneN = eligibility.steps.filter(function (s) { return s.done; }).length, allN = eligibility.steps.length; %>
         <div class="panel-head">
-          <h2>Before you can bid</h2>
-          <% if (eligibility.ok) { %><span class="tag tag-ok">Ready to bid</span><% } else { %><span class="tag tag-warn"><%= eligibility.steps.filter(function (s) { return !s.done; }).length %> left to do</span><% } %>
+          <h2><%= eligibility.ok ? 'You are cleared to bid' : 'Before you can bid' %></h2>
+          <% if (eligibility.ok) { %><span class="tag tag-ok">Ready to bid</span><% } else { %><span class="tag tag-warn"><%= allN - doneN %> left to do</span><% } %>
         </div>
+        <% if (allN) { %><div class="panel-body" style="padding-bottom:0"><div class="progress"><span class="tnum"><%= doneN %> of <%= allN %> done</span><span class="progress-bar" aria-hidden="true"><span style="width:<%= Math.round(doneN / allN * 100) %>%"></span></span></div></div><% } %>
         <div class="panel-body">
           <% if (!eligibility.steps.length) { %>
             <p>Nothing to do. You can bid in any live auction.</p>
@@ -40,7 +42,7 @@
               <tbody>
                 <% activeLots.forEach(function (l) { %>
                   <tr>
-                    <td class="cell-main"><a class="primary" href="/auctions/<%= l.auction_id %>">Lot <%= l.lot_no %>: <%= l.title %></a><span class="sub"><%= l.auction_title %></span></td>
+                    <td class="cell-main"><a class="primary" href="/auctions/<%= l.auction_id %>/lots/<%= l.id %>">Lot <%= l.lot_no %>: <%= l.title %></a><span class="sub"><%= l.auction_title %></span></td>
                     <td class="num" data-label="Your bid"><%= fmtINR(l.my_amount) %><span class="sub">per <%= l.unit %></span></td>
                     <td class="num" data-label="Highest bid"><%= l.top_amount === null ? 'Hidden' : fmtINR(l.top_amount) %></td>
                     <td data-label="Standing"><span class="standing <%= l.leading ? 'lead' : 'out' %>"><%= l.leading ? 'Leading' : 'Outbid' %></span></td>

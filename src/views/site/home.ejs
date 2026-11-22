@@ -1,80 +1,205 @@
+<%
+  var I = function (n, size) { return include('../partials/icon', { name: n, size: size || 20 }); };
+  var tel = S.contact_phone ? S.contact_phone.replace(/[^\d+]/g, '') : '';
+%>
 <section class="hero" data-server-now="<%= Date.now() %>">
   <div class="wrap">
     <%- include('../partials/flash') %>
-    <h1><%= S.tagline %></h1>
-    <p>Plants, rail yards and manufacturers list scrap metal, used machinery and surplus stock here, and verified buyers bid on it online, lot by lot, until each lot closes.</p>
-    <div class="row">
-      <% if (user) { %>
-        <a class="btn btn-accent" href="/account">Go to my account</a>
-      <% } else if (S.registration_open === '1') { %>
-        <a class="btn btn-accent" href="/register">Register to bid</a>
-      <% } else { %>
-        <a class="btn btn-accent" href="/login">Sign in to bid</a>
-      <% } %>
-      <a class="btn btn-quiet" href="/auctions">View auction schedule</a>
-    </div>
-    <div class="hero-board">
-      <%- include('_board', { board: board, boardLink: ['/auctions', 'Full schedule'] }) %>
+    <div class="hero-grid">
+      <div>
+        <h1><%= S.tagline %></h1>
+        <p>Plants, rail yards and manufacturers list scrap metal, used machinery and surplus stores here. Verified buyers bid online, lot by lot, and the highest bid at the close goes to the seller for approval.</p>
+        <form class="hero-search" method="get" action="/auctions" role="search">
+          <div class="input-ico">
+            <%- I('search', 18) %>
+            <label class="sr" for="h-q">Material or keyword</label>
+            <input type="search" id="h-q" name="q" placeholder="Material, grade or seller" autocomplete="off">
+          </div>
+          <div>
+            <label class="sr" for="h-cat">Category</label>
+            <select id="h-cat" name="category">
+              <option value="">All categories</option>
+              <% filters.categories.forEach(function (c) { %><option><%= c %></option><% }) %>
+            </select>
+          </div>
+          <div class="input-ico">
+            <%- I('pin', 18) %>
+            <label class="sr" for="h-loc">Location</label>
+            <input type="text" id="h-loc" name="location" placeholder="City or state" list="h-locs" autocomplete="off">
+            <datalist id="h-locs"><% filters.locations.forEach(function (l) { %><option value="<%= l %>"><% }) %></datalist>
+          </div>
+          <button class="btn btn-accent" type="submit">Find auctions</button>
+        </form>
+        <div class="hero-links">
+          <% if (user) { %><span>Signed in as <%= bidderNo(user.id) %>. <a href="/account">Go to my account</a></span>
+          <% } else if (S.registration_open === '1') { %><span>New buyer? <a href="/register">Register your company to bid</a></span><% } %>
+          <span><a href="/auctions?view=schedule">See the full auction schedule</a></span>
+        </div>
+      </div>
+
+      <aside class="live-panel" aria-labelledby="live-h">
+        <% if (liveNow.length) { %>
+          <div class="live-panel-head"><h2 id="live-h"><span class="live-dot" aria-hidden="true"></span>Live now</h2><a href="/auctions?show=live">All live auctions</a></div>
+          <% liveNow.forEach(function (a) { %>
+            <a class="live-item" href="/auctions/<%= a.id %>">
+              <span class="thumb"><% if (a.cover_id) { %><img src="/media/<%= a.cover_id %>?size=thumb" alt="" width="56" height="56" loading="lazy"><% } else { %><%- include('../partials/ph', { category: a.category, small: true, iconSize: 22 }) %><% } %></span>
+              <span><b><%= a.title %></b><span class="sub"><%= a.lot_count %> <%= a.lot_count === 1 ? 'lot' : 'lots' %><% if (a.location) { %>, <%= a.location.split(',').slice(-2).join(',').trim() %><% } %></span></span>
+              <span class="when"><span>Closes in</span><b class="countdown" data-countdown="<%= a.closeAt %>" data-done="Closing"></b></span>
+            </a>
+          <% }) %>
+          <div class="live-panel-foot"><span>Server time, IST</span><span class="tnum"><%= fmtTime(new Date()) %></span></div>
+        <% } else if (nextUp) { %>
+          <div class="live-panel-head"><h2 id="live-h">Next auction</h2><a href="/auctions?show=upcoming">All upcoming</a></div>
+          <div class="live-next">
+            <span class="tag tag-upcoming">Starts <%= nextUp.weekday %> <%= nextUp.dayNum %> <%= nextUp.month %>, <%= fmtTime(nextUp.starts_at) %></span>
+            <h3><a href="/auctions/<%= nextUp.id %>"><%= nextUp.title %></a></h3>
+            <ul class="meta">
+              <% if (nextUp.seller_name) { %><li><%- I('factory', 17) %><span><%= nextUp.seller_name %></span></li><% } %>
+              <% if (nextUp.location) { %><li><%- I('pin', 17) %><span><%= nextUp.location %></span></li><% } %>
+              <li><%- I('package', 17) %><span><%= nextUp.lot_count %> <%= nextUp.lot_count === 1 ? 'lot' : 'lots' %></span></li>
+            </ul>
+            <span class="big-count countdown" data-countdown="<%= nextUp.startAt %>" data-done="Starting"></span>
+            <span class="muted small">until bidding opens</span>
+            <div class="form-actions"><a class="btn" href="/auctions/<%= nextUp.id %>">View the lots</a></div>
+          </div>
+        <% } else { %>
+          <div class="live-panel-head"><h2 id="live-h">Auction schedule</h2></div>
+          <div class="live-next">
+            <p>No auction is scheduled right now. New auctions are usually announced a few days ahead, and registered bidders get an email when one is published.</p>
+            <a class="btn btn-quiet" href="/auctions?show=closed">See past results</a>
+          </div>
+        <% } %>
+      </aside>
     </div>
   </div>
 </section>
 
-<div class="wrap after-hero">
-  <section class="section">
-    <h2>How bidding works</h2>
-    <ol class="seq">
-      <li>
-        <h3>Register your company</h3>
-        <p>Sign up with your company name, mobile number and work email, then confirm the email address from the link we send.</p>
-      </li>
-      <li>
-        <% if (kyc || fee) { %>
-          <h3>Get cleared to bid</h3>
-          <p><% if (kyc) { %>Upload your GST certificate, PAN and address proof for a one-time check<% } %><% if (kyc && fee) { %>, and pay<% } else if (fee) { %>Pay<% } %><% if (fee) { %> the yearly registration fee online<% } %>. You can bid once this is done.</p>
-        <% } else { %>
-          <h3>Complete your business profile</h3>
-          <p>Add your GSTIN or PAN and registered address so sellers can raise invoices in your company's name.</p>
-        <% } %>
-      </li>
-      <li>
-        <h3>Inspect the material and bid</h3>
-        <p>Each auction lists its lots with quantity, starting price per unit and inspection dates at the seller's site. While the auction is live, bid on any lot. A bid in the last few minutes extends that lot, so everyone gets a fair chance to respond.</p>
-      </li>
-      <li>
-        <h3>Get the award and lift the material</h3>
-        <p>When a lot closes, the seller reviews the highest bid and confirms the award. You pay the seller as per the auction terms and collect the material from their yard.</p>
-      </li>
-    </ol>
-    <p class="small"><a href="/how-it-works">Read the full bidding rules</a></p>
+<% if (stats.length) { %>
+  <section class="stats-strip" aria-label="Platform record">
+    <div class="wrap">
+      <% stats.forEach(function (s) { %><div class="s"><b><%= fmtNum(s[0]) %></b><span><%= s[1] %></span></div><% }) %>
+    </div>
   </section>
+<% } %>
 
+<div class="wrap">
   <section class="section">
-    <div class="row-between section-head"><h2>Recently closed</h2><a class="small" href="/auctions?show=closed">All closed auctions</a></div>
-    <% if (!closed.length) { %>
-      <div class="table-wrap"><div class="empty"><p>Closed auctions and their results will be listed here.</p></div></div>
+    <div class="row-between section-head">
+      <div><h2>Live and upcoming auctions</h2><p>Live auctions first, by closing time, then upcoming auctions by start time. All times IST.</p></div>
+      <div class="row"><a class="btn btn-quiet btn-sm" href="/auctions?view=schedule"><%- I('list', 16) %>Schedule view</a><a class="btn btn-sm" href="/auctions">All auctions</a></div>
+    </div>
+    <% if (!board.length) { %>
+      <div class="panel"><div class="empty">
+        <div class="empty-ico"><%- I('calendar', 24) %></div>
+        <h3>No auctions are scheduled right now</h3>
+        <p>New auctions are usually announced a few days ahead. Registered bidders get an email when one is published.</p>
+      </div></div>
     <% } else { %>
-      <div class="table-wrap">
-        <table class="table table-stack">
-          <thead><tr><th>Auction</th><th>Seller</th><th class="num">Lots</th><th>Closed on</th><th><span class="sr">Results</span></th></tr></thead>
-          <tbody>
-            <% closed.forEach(function (a) { %>
-              <tr>
-                <td class="cell-main"><a class="primary" href="/auctions/<%= a.id %>"><%= a.title %></a><% if (a.location) { %><span class="sub"><%= a.location %></span><% } %></td>
-                <td data-label="Seller"><%= a.seller_name || 'Not disclosed' %></td>
-                <td class="num" data-label="Lots"><%= a.lot_count %></td>
-                <td data-label="Closed on"><%= fmtDate(a.closed_at || a.ends_at) %></td>
-                <td class="actions" data-label=""><a href="/auctions/<%= a.id %>">View results</a></td>
-              </tr>
-            <% }) %>
-          </tbody>
-        </table>
+      <div class="card-grid">
+        <% board.forEach(function (a) { %><%- include('_card', { a: a }) %><% }) %>
       </div>
     <% } %>
   </section>
 
-  <section class="section sell">
-    <h2>Sell your scrap or surplus through us</h2>
-    <p>If your plant or yard has ferrous or non-ferrous scrap, idle machinery, cable, or surplus stores to dispose of, we run the auction for you: lot listing, bidder verification, the live bidding and a full bid report for your records.</p>
-    <a class="btn btn-quiet" href="/contact">Talk to us about selling</a>
+  <% if (categories.length) { %>
+    <section class="section">
+      <div class="section-head"><h2>Browse by material</h2></div>
+      <div class="cat-grid">
+        <% categories.forEach(function (c) { %>
+          <a class="cat-tile" href="/auctions?category=<%= encodeURIComponent(c.category) %><%= c.open ? '' : '&show=closed' %>">
+            <span class="cat-ico"><%- include('../partials/cat_icon', { category: c.category, size: 26 }) %></span>
+            <span><b><%= c.category %></b>
+              <span><% if (c.open) { %><span class="open-n"><%= c.open %> open</span>, <% } %><%= c.total %> <%= c.total === 1 ? 'auction' : 'auctions' %> listed</span></span>
+          </a>
+        <% }) %>
+      </div>
+    </section>
+  <% } %>
+
+  <section class="section">
+    <div class="row-between section-head">
+      <div><h2>How bidding works</h2><p>From registration to lifting the material, in four steps.</p></div>
+      <a href="/how-it-works">Read the full bidding rules</a>
+    </div>
+    <ol class="seq">
+      <li>
+        <div class="seq-ico"><%- I('factory', 26) %></div>
+        <h3>Register your company</h3>
+        <p>Sign up with your company name, mobile number and work email, then confirm the email from the link we send.</p>
+      </li>
+      <li>
+        <div class="seq-ico"><%- I('shield', 26) %></div>
+        <% if (kyc || fee) { %>
+          <h3>Get cleared to bid</h3>
+          <p><% if (kyc) { %>Upload your GST certificate, PAN and address proof for a one-time check<% } %><% if (kyc && fee) { %>, and pay<% } else if (fee) { %>Pay<% } %><% if (fee) { %> the yearly registration fee online<% } %>.</p>
+        <% } else { %>
+          <h3>Complete your business profile</h3>
+          <p>Add your GSTIN or PAN and registered address so sellers can invoice your company.</p>
+        <% } %>
+      </li>
+      <li>
+        <div class="seq-ico"><%- I('gavel', 26) %></div>
+        <h3>Inspect and bid</h3>
+        <p>Inspect the material at the seller's site, then bid on any lot while the auction is live. A late bid extends that lot.</p>
+      </li>
+      <li>
+        <div class="seq-ico"><%- I('truck', 26) %></div>
+        <h3>Get the award and lift</h3>
+        <p>The seller approves the highest bid. You pay as per the auction terms and collect the material from their yard.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="section why">
+    <div class="why-intro">
+      <h2>Built for buyers and sellers who need a clean record</h2>
+      <p>Every auction runs on the same rules for every bidder, and every step is recorded. That is what lets a plant's stores and accounts teams sign off on the sale.</p>
+    </div>
+    <div class="why-list">
+      <% if (kyc) { %><div><%- I('shield', 24) %><h3>Only verified companies bid</h3><p>Each bidder's GST certificate, PAN and address proof are checked by our team before their first bid.</p></div>
+      <% } else { %><div><%- I('shield', 24) %><h3>Registered companies only</h3><p>Bidders register with their company details and a verified email address before they can place a bid.</p></div><% } %>
+      <div><%- I('timer', 24) %><h3>Late bids extend the lot</h3><p>A bid in the final minutes pushes that lot's close out, so the best price wins instead of the fastest click.</p></div>
+      <div><%- I('clipboard', 24) %><h3>Every bid is logged</h3><p>Amount, bidder and server time are recorded for every bid. Sellers get the full bid report for their records.</p></div>
+      <div><%- I('award', 24) %><h3>The seller approves the award</h3><p>When a lot closes, the seller reviews the highest bid and confirms or declines it. Nothing is sold without that approval.</p></div>
+    </div>
+  </section>
+
+  <section class="section sell-band">
+    <div class="sb-main">
+      <h2>Sell your scrap or surplus through us</h2>
+      <p>If your plant or yard has ferrous or non-ferrous scrap, idle machinery, cable or surplus stores to dispose of, we run the auction for you.</p>
+      <ul>
+        <li><%- I('check', 18) %>Lot listing with photos and specifications</li>
+        <li><%- I('check', 18) %>Bidder verification and registration fees</li>
+        <li><%- I('check', 18) %>Live bidding with automatic extension</li>
+        <li><%- I('check', 18) %>Full bid report and award approval</li>
+      </ul>
+      <a class="btn" href="/contact">Talk to us about selling</a>
+    </div>
+    <div class="sb-side">
+      <span class="muted small">Speak to our auction desk</span>
+      <% if (S.contact_phone) { %><a href="tel:<%= tel %>"><%- I('phone', 18) %><%= S.contact_phone %></a><% } %>
+      <a href="mailto:<%= S.contact_email %>"><%- I('mail', 18) %><%= S.contact_email %></a>
+      <% if (S.support_hours) { %><span class="muted small"><%= S.support_hours %></span><% } %>
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="row-between section-head"><h2>Recently closed</h2><a href="/auctions?show=closed">All closed auctions</a></div>
+    <% if (!closed.length) { %>
+      <div class="panel"><div class="empty"><p>Closed auctions and their results will be listed here.</p></div></div>
+    <% } else { %>
+      <div class="clist">
+        <% closed.forEach(function (a) { var d = new Date(a.closed_at || a.ends_at); %>
+          <a class="ci" href="/auctions/<%= a.id %>">
+            <span class="ci-date" aria-hidden="true"><b><%= fmtDate(d).split(' ')[0] %></b><span><%= fmtDate(d).split(' ')[1] %></span></span>
+            <span class="ci-title"><b><%= a.title %></b><span><%= a.seller_name || 'Seller not disclosed' %></span></span>
+            <span class="ci-cell"><%= a.category %></span>
+            <span class="ci-cell tnum"><%= a.lot_count %> <%= a.lot_count === 1 ? 'lot' : 'lots' %></span>
+            <span class="ci-go">View results<span class="sr">, closed <%= fmtDate(d) %></span></span>
+          </a>
+        <% }) %>
+      </div>
+    <% } %>
   </section>
 </div>

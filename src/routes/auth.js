@@ -28,7 +28,7 @@ const signIn = (req, userId) => new Promise((resolve, reject) => {
 
 const tooMany = (view, extra) => (req, res) => {
   res.status(429);
-  res.page(view, {
+  res.page(view, { fullBleed: true,
     title: extra.title, values: { email: clean(req.body && req.body.email, 200) }, errors: {},
     formError: extra.message,
   });
@@ -80,7 +80,7 @@ const blankRegister = { name: '', email: '', phone: '', company_name: '', busine
 
 function renderRegister(res, values, errors, status = 200) {
   res.status(status);
-  res.page('site/register', {
+  res.page('site/register', { fullBleed: true,
     title: 'Register as a bidder',
     open: settings.bool('registration_open'),
     businessTypes: settings.list('business_types'),
@@ -179,7 +179,7 @@ router.get('/login', (req, res) => {
   const next = safePath(req.query.next);
   if (next) req.session.returnTo = next;
   if (req.user) return res.redirect(next || '/account');
-  res.page('site/login', { title: 'Sign in', values: { email: '' }, errors: {}, formError: '' });
+  res.page('site/login', { fullBleed: true, title: 'Sign in', values: { email: '' }, errors: {}, formError: '' });
 });
 
 router.post('/login', loginLimiter, wrap(async (req, res) => {
@@ -187,7 +187,7 @@ router.post('/login', loginLimiter, wrap(async (req, res) => {
   const password = String(req.body.password || '');
   const fail = (msg) => {
     res.status(422);
-    res.page('site/login', { title: 'Sign in', values: { email }, errors: {}, formError: msg });
+    res.page('site/login', { fullBleed: true, title: 'Sign in', values: { email }, errors: {}, formError: msg });
   };
   const user = email ? await db.one('SELECT id, password_hash, blocked FROM users WHERE lower(email) = $1', [email]) : null;
   const ok = await bcrypt.compare(password, user ? user.password_hash : DUMMY_HASH);
@@ -210,14 +210,14 @@ router.post('/logout', (req, res) => {
 /* ---------------- Password reset ---------------- */
 
 router.get('/forgot-password', (req, res) => {
-  res.page('site/forgot', { title: 'Reset your password', values: { email: '' }, errors: {}, formError: '' });
+  res.page('site/forgot', { fullBleed: true, title: 'Reset your password', values: { email: '' }, errors: {}, formError: '' });
 });
 
 router.post('/forgot-password', forgotLimiter, wrap(async (req, res) => {
   const email = normEmail(req.body.email);
   if (!isEmail(email)) {
     res.status(422);
-    return res.page('site/forgot', { title: 'Reset your password', values: { email }, errors: { email: 'Enter the email address you registered with.' }, formError: '' });
+    return res.page('site/forgot', { fullBleed: true, title: 'Reset your password', values: { email }, errors: { email: 'Enter the email address you registered with.' }, formError: '' });
   }
   const tok = token();
   const user = await db.one(
@@ -240,14 +240,14 @@ const findReset = (t) => (String(t || '').length >= 16
 router.get('/reset-password/:token', wrap(async (req, res) => {
   const user = await findReset(req.params.token);
   res.status(user ? 200 : 410);
-  res.page('site/reset', { title: 'Choose a new password', valid: !!user, token: req.params.token, errors: {} });
+  res.page('site/reset', { fullBleed: true, title: 'Choose a new password', valid: !!user, token: req.params.token, errors: {} });
 }));
 
 router.post('/reset-password/:token', wrap(async (req, res) => {
   const user = await findReset(req.params.token);
   if (!user) {
     res.status(410);
-    return res.page('site/reset', { title: 'Choose a new password', valid: false, token: '', errors: {} });
+    return res.page('site/reset', { fullBleed: true, title: 'Choose a new password', valid: false, token: '', errors: {} });
   }
   const password = String(req.body.password || '');
   const e = {};
@@ -256,7 +256,7 @@ router.post('/reset-password/:token', wrap(async (req, res) => {
   else if (String(req.body.confirm || '') !== password) e.confirm = 'The two passwords do not match.';
   if (Object.keys(e).length) {
     res.status(422);
-    return res.page('site/reset', { title: 'Choose a new password', valid: true, token: req.params.token, errors: e });
+    return res.page('site/reset', { fullBleed: true, title: 'Choose a new password', valid: true, token: req.params.token, errors: e });
   }
   const hash = await bcrypt.hash(password, BCRYPT_COST);
   // The link proves the bidder can read this inbox, so the email counts as verified too.

@@ -2,11 +2,11 @@
   function kb(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
 %>
 <div class="wrap">
+  <%- include('_nav') %>
   <div class="page-head">
     <h1>Verification</h1>
     <p>We check every bidder's business documents before they can bid. Upload clear scans or photos; PDF, JPG, PNG or WebP up to 5 MB each.</p>
   </div>
-  <%- include('_nav') %>
 
   <% if (!kycRequired) { %>
     <div class="notice">Document approval is not currently required to bid. You can still upload your documents so your account is ready if this changes.</div>

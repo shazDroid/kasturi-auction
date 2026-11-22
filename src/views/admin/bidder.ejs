@@ -67,7 +67,9 @@
             </form>
           <% } %>
         </div>
-                <form method="post" action="/admin/bidders/<%= u.id %>/kyc/reject" class="mt">
+        <details class="ax-details mt"<%= u.kyc_status === 'pending' ? ' open' : '' %>>
+          <summary><%= u.kyc_status === 'approved' ? 'Withdraw approval and reject documents' : 'Reject documents with a reason' %></summary>
+          <form method="post" action="/admin/bidders/<%= u.id %>/kyc/reject">
           <%- include('_csrf') %>
           <div class="field">
             <label for="reason">Reason for rejecting</label>
@@ -76,6 +78,7 @@
           </div>
           <button class="btn btn-danger" type="submit">Reject documents</button>
         </form>
+        </details>
       </div>
     </div>
 

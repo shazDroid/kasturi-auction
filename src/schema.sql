@@ -204,3 +204,35 @@ CREATE TABLE IF NOT EXISTS audit_log (
   detail     text NOT NULL DEFAULT '',
   created_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- ---------- v2: images, documents, lot specifications ----------
+ALTER TABLE files    ADD COLUMN IF NOT EXISTS thumb  bytea;
+ALTER TABLE files    ADD COLUMN IF NOT EXISTS width  integer;
+ALTER TABLE files    ADD COLUMN IF NOT EXISTS height integer;
+ALTER TABLE auctions ADD COLUMN IF NOT EXISTS cover_id integer REFERENCES files(id) ON DELETE SET NULL;
+ALTER TABLE sellers  ADD COLUMN IF NOT EXISTS logo_id  integer REFERENCES files(id) ON DELETE SET NULL;
+-- [{ "label": "Grade", "value": "EN8" }, ...]
+ALTER TABLE lots     ADD COLUMN IF NOT EXISTS specs jsonb NOT NULL DEFAULT '[]';
+
+CREATE TABLE IF NOT EXISTS lot_images (
+  id         serial PRIMARY KEY,
+  lot_id     integer NOT NULL REFERENCES lots(id) ON DELETE CASCADE,
+  file_id    integer NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS lot_images_lot ON lot_images(lot_id, sort_order, id);
+
+CREATE TABLE IF NOT EXISTS auction_documents (
+  id         serial PRIMARY KEY,
+  auction_id integer NOT NULL REFERENCES auctions(id) ON DELETE CASCADE,
+  file_id    integer NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+  title      text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS auction_documents_auction ON auction_documents(auction_id);
+
+-- v1 kept a single photo per lot in lots.image_id; carry those into the gallery once.
+INSERT INTO lot_images(lot_id, file_id)
+SELECT l.id, l.image_id FROM lots l
+ WHERE l.image_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM lot_images li WHERE li.lot_id = l.id);

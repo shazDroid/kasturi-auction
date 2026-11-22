@@ -7,8 +7,8 @@
 
 <% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. The auction was not saved.</div><% } %>
 
-<form method="post" action="<%= auction ? '/admin/auctions/' + auction.id : '/admin/auctions' %>" novalidate>
-  <%- include('_csrf') %>
+<form method="post" enctype="multipart/form-data" novalidate
+      action="<%= auction ? '/admin/auctions/' + auction.id : '/admin/auctions' %>?_csrf=<%= csrf %>">
   <div class="panel">
     <div class="panel-head"><h3>What is being sold</h3></div>
     <div class="panel-body">
@@ -36,19 +36,52 @@
           <label for="location">Material location</label>
           <input type="text" id="location" name="location" value="<%= v.location %>" maxlength="200" placeholder="Plant or yard address, city and state">
         </div>
-        <div class="field full">
-          <label for="description">Description</label>
-          <textarea id="description" name="description" rows="5"><%= v.description %></textarea>
-          <div class="hint">Shown on the auction page. Plain text; blank lines start a new paragraph.</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Cover photo</h3><span class="muted small">Optional. Shown on the auction list and at the top of the auction page.</span></div>
+    <div class="panel-body">
+      <div class="ax-cover-field">
+        <% if (auction && v.cover_id) { %>
+          <figure class="ax-cover-current">
+            <img src="/media/<%= v.cover_id %>?size=thumb" alt="Current cover photo of this auction" width="240" height="180">
+            <figcaption class="check">
+              <input type="checkbox" id="remove_cover" name="remove_cover" value="1" <%= v.remove_cover ? 'checked' : '' %>>
+              <label for="remove_cover">Remove cover photo</label>
+            </figcaption>
+          </figure>
+        <% } %>
+        <div class="field grow">
+          <label for="cover"><%= auction && v.cover_id ? 'Replace with another photo' : 'Choose a photo' %></label>
+          <input type="file" id="cover" name="cover" accept="image/jpeg,image/png,image/webp" data-preview="cover-preview" aria-describedby="cover-hint<%= errors.cover ? ' err-cover' : '' %>">
+          <%- include('_err', { k: 'cover' }) %>
+          <div class="hint" id="cover-hint">JPG, PNG or WebP, up to 8 MB. A wide photo of the heap or the yard works best; it is cropped to 4:3 in lists.<% if (Object.keys(errors).length) { %> If you had chosen a photo, choose it again.<% } %></div>
+          <div class="ax-previews" id="cover-preview" aria-live="polite"></div>
         </div>
-        <div class="field full">
-          <label for="inspection">Inspection details</label>
-          <textarea id="inspection" name="inspection" rows="3" placeholder="Dates, timings, contact person and what to bring"><%= v.inspection %></textarea>
-        </div>
-        <div class="field full">
-          <label for="terms">Terms and conditions for this auction</label>
-          <textarea id="terms" name="terms" rows="5" placeholder="Payment terms, EMD, lifting period, GST and TCS, weighment"><%= v.terms %></textarea>
-        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head"><h3>Description, inspection and terms</h3><span class="muted small">Shown to bidders on the auction page</span></div>
+    <div class="panel-body">
+      <div class="field">
+        <label for="description" id="description-label">Description</label>
+        <textarea id="description" name="description" rows="8" data-rich data-label-id="description-label" data-placeholder="What is on sale, where it comes from and how it is stored"><%= v.description %></textarea>
+        <%- include('_err', { k: 'description' }) %>
+        <div class="hint">Use headings and lists to make long descriptions easy to scan. Lot details go on each lot.</div>
+      </div>
+      <div class="field">
+        <label for="inspection" id="inspection-label">Inspection details</label>
+        <textarea id="inspection" name="inspection" rows="5" data-rich data-label-id="inspection-label" data-placeholder="Dates, timings, contact person and what to bring"><%= v.inspection %></textarea>
+        <%- include('_err', { k: 'inspection' }) %>
+      </div>
+      <div class="field">
+        <label for="terms" id="terms-label">Terms and conditions for this auction</label>
+        <textarea id="terms" name="terms" rows="8" data-rich data-label-id="terms-label" data-placeholder="Payment terms, EMD, lifting period, GST and TCS, weighment"><%= v.terms %></textarea>
+        <%- include('_err', { k: 'terms' }) %>
       </div>
     </div>
   </div>
