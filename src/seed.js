@@ -178,13 +178,18 @@ async function seedPages() {
   }
 }
 
+/**
+ * Ensures the super admin named by ADMIN_EMAIL / ADMIN_PASSWORD exists. It is created if no admin
+ * has that email yet, so changing the two variables and redeploying adds another super admin.
+ * An existing account is never modified here: passwords are changed in the admin panel.
+ */
 async function seedAdmin() {
-  const existing = await db.one('SELECT count(*)::int AS n FROM admins');
-  if (existing.n > 0) return;
-
   let email = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
   let password = process.env.ADMIN_PASSWORD || '';
-  if (!email || !password) {
+  const fromEnv = !!(email && password);
+  if (!fromEnv) {
+    const existing = await db.one('SELECT count(*)::int AS n FROM admins');
+    if (existing.n > 0) return;
     if (PROD) {
       console.warn('[seed] WARNING: no admin account exists and ADMIN_EMAIL / ADMIN_PASSWORD are not set. '
         + 'Set both environment variables and restart to create the first super admin.');
@@ -192,18 +197,20 @@ async function seedAdmin() {
     }
     email = 'admin@kasturi.local';
     password = 'admin12345';
-    console.log(`[seed] Created development super admin: ${email} / ${password}`);
-  } else if (password.length < 8) {
-    console.warn('[seed] WARNING: ADMIN_PASSWORD must be at least 8 characters. No admin account was created.');
-    return;
+  } else {
+    if (await db.one('SELECT 1 FROM admins WHERE email = $1', [email])) return;
+    if (password.length < 8) {
+      console.warn('[seed] WARNING: ADMIN_PASSWORD must be at least 8 characters. No admin account was created.');
+      return;
+    }
   }
   const hash = await bcrypt.hash(password, 11);
   // ON CONFLICT covers two instances booting at the same moment.
-  await db.query(
+  const made = await db.query(
     `INSERT INTO admins(name, email, password_hash, role) VALUES('Administrator', $1, $2, 'superadmin') ON CONFLICT (email) DO NOTHING`,
     [email, hash]
   );
-  if (process.env.ADMIN_EMAIL) console.log(`[seed] Created super admin ${email}`);
+  if (made.rowCount) console.log(fromEnv ? `[seed] Created super admin ${email}` : `[seed] Created development super admin: ${email} / ${password}`);
 }
 
 // ---------------------------------------------------------------------------------------------
