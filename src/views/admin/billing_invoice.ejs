@@ -1,0 +1,171 @@
+<%
+  var invTag = { unpaid: 'tag tag-warn', part_paid: 'tag tag-upcoming', paid: 'tag tag-ok', cancelled: 'tag' }[inv.status] || 'tag';
+  var b = s.bill_to;
+  var here = '/admin/billing/invoices/' + inv.id;
+  var open = inv.status !== 'cancelled';
+%>
+<div class="page-head">
+  <div>
+    <h1>Invoice <%= inv.number %></h1>
+    <p class="row"><span class="<%= invTag %>"><%= STATUSES[inv.status] %></span><% if (overdue) { %><span class="tag tag-bad">Overdue</span><% } %><span><%= KINDS[inv.kind] || inv.kind %>, issued <%= fmtDT(inv.issued_at) %><%= issuer ? ' by ' + issuer.name : '' %></span></p>
+  </div>
+  <div class="row">
+    <a class="btn btn-quiet" href="<%= here %>.pdf" target="_blank" rel="noopener">Open PDF</a>
+    <a class="btn btn-quiet" href="<%= here %>.pdf?download=1">Download PDF</a>
+    <% if (open) { %>
+    <form method="post" action="<%= here %>/email" class="inline-form"><%- include('_csrf') %>
+      <button class="btn btn-quiet" type="submit" data-confirm="Email this invoice to <%= u.email %>?">Email invoice</button>
+    </form>
+    <% } %>
+  </div>
+</div>
+
+<% if (inv.status === 'cancelled') { %>
+  <div class="notice notice-warn"><p>Cancelled: <%= inv.cancel_note %>. The number <%= inv.number %> stays used and is not given to another invoice.</p></div>
+<% } %>
+
+<div class="cols">
+  <div>
+    <article class="panel bl-doc">
+      <div class="panel-body">
+        <header class="bl-doc-head">
+          <div>
+            <h2><%= s.company.name %></h2>
+            <p class="muted small"><%= [s.company.address, s.company.gstin ? 'GSTIN ' + s.company.gstin : '', s.company.state].filter(Boolean).join(', ') %></p>
+          </div>
+          <dl class="bl-facts">
+            <dt>Invoice no.</dt><dd><%= inv.number %></dd>
+            <dt>Date</dt><dd><%= fmtDate(s.issued_at) %></dd>
+            <% if (s.due_at) { %><dt>Due</dt><dd><%= fmtDate(s.due_at) %></dd><% } %>
+          </dl>
+        </header>
+        <div class="cols-even bl-parties">
+          <section>
+            <h3>Bill to</h3>
+            <p><b><%= b.company || b.name %></b><% if (b.company) { %><br><%= b.name %><% } %>
+              <% if (b.address) { %><br><%= b.address %><% } %>
+              <% if (b.city || b.state || b.pincode) { %><br><%= [b.city, b.state, b.pincode].filter(Boolean).join(', ') %><% } %></p>
+            <p class="small">GSTIN: <%= b.gstin || 'not registered' %><% if (b.pan) { %>, PAN: <%= b.pan %><% } %><br>Bidder no.: <a href="/admin/bidders/<%= inv.user_id %>"><%= b.bidder_no %></a>, <a href="/admin/billing/statement/<%= inv.user_id %>">statement</a></p>
+          </section>
+          <section>
+            <h3>Supply details</h3>
+            <dl class="kv bl-kv">
+              <dt>Place of supply</dt><dd><%= s.place_of_supply || 'Not given' %></dd>
+              <dt>Tax</dt><dd><%= s.intra_state ? 'CGST + SGST (same state)' : 'IGST (other state)' %></dd>
+              <dt>SAC</dt><dd><%= s.sac %></dd>
+              <% if (s.ref && s.ref.lot_id) { %><dt>Lot</dt><dd><a href="/admin/lots/<%= s.ref.lot_id %>">Lot <%= s.ref.lot_no %>: <%= s.ref.lot_title %></a></dd><% } %>
+              <% if (so) { %><dt>Sale order</dt><dd><a href="/admin/billing/sale-orders/<%= so.id %>"><%= so.number %></a></dd><% } %>
+              <% if (s.ref && s.ref.payment_ref) { %><dt>Fee payment</dt><dd><span class="code"><%= s.ref.payment_ref %></span></dd><% } %>
+            </dl>
+          </section>
+        </div>
+        <div class="table-wrap flat bl-lines">
+          <table class="table">
+            <thead><tr><th>#</th><th>Description</th><th class="num">Qty</th><th class="num">Rate</th><th class="num">Amount</th></tr></thead>
+            <tbody>
+            <% s.lines.forEach(function (l, i) { %>
+              <tr><td><%= i + 1 %></td><td><%= l.description %></td><td class="num"><%= fmtNum(l.qty) %><%= l.unit ? ' ' + l.unit : '' %></td><td class="num nowrap"><%= fmtINR(l.rate) %></td><td class="num nowrap"><%= fmtINR(l.amount) %></td></tr>
+            <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <table class="bl-totals">
+          <tr><th>Taxable value</th><td><%= fmtINR(s.subtotal) %></td></tr>
+          <% (s.tax_lines || []).forEach(function (t) { %><tr><th><%= t.code %> at <%= fmtNum(t.rate) %>%</th><td><%= fmtINR(t.amount) %></td></tr><% }) %>
+          <tr class="is-strong"><th>Invoice total</th><td><%= fmtINR(inv.total) %></td></tr>
+          <tr><th>Paid</th><td><%= fmtINR(inv.paid) || '₹0' %></td></tr>
+          <tr class="is-strong"><th>Balance due</th><td><%= fmtINR(inv.balance) || '₹0' %></td></tr>
+        </table>
+        <% if (s.note) { %><h3 class="bl-h">Note</h3><div class="bl-pre small"><%= s.note %></div><% } %>
+      </div>
+    </article>
+
+    <section class="admin-section">
+      <h2>Payments received</h2>
+      <div class="table-wrap">
+      <% if (!inv.payments.length) { %>
+        <div class="empty"><h3>No payments recorded</h3><p><%= open ? 'Record a payment when money is received against this invoice.' : 'This invoice is cancelled.' %></p></div>
+      <% } else { %>
+        <table class="table table-stack">
+          <thead><tr><th>Date</th><th>Method</th><th>Reference</th><th>Note</th><th>Recorded by</th><th class="num">Amount</th><th></th></tr></thead>
+          <tbody>
+          <% inv.payments.forEach(function (p) { %>
+            <tr>
+              <td class="cell-main nowrap"><%= fmtDate(p.paid_on + 'T12:00:00+05:30') %></td>
+              <td data-label="Method"><%= PAY_METHODS[p.method] || p.method %></td>
+              <td data-label="Reference" class="note-cell"><%= p.reference %></td>
+              <td data-label="Note" class="note-cell"><%= p.note %></td>
+              <td data-label="Recorded by"><%= p.recorded_by_name || 'System' %><span class="sub"><%= fmtDT(p.created_at) %></span></td>
+              <td class="num" data-label="Amount"><b><%= fmtINR(p.amount) %></b></td>
+              <td class="actions">
+                <% if (open) { %>
+                <form method="post" action="/admin/billing/invoice-payments/<%= p.id %>/remove" class="inline-form"><%- include('_csrf') %>
+                  <input type="hidden" name="back" value="<%= here %>">
+                  <button class="linkbtn danger" type="submit" data-confirm="Remove this payment of <%= fmtINR(p.amount) %>? The invoice balance goes up again.">Remove</button>
+                </form>
+                <% } %>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+          <tfoot><tr><td colspan="5">Total received</td><td class="num"><%= fmtINR(inv.paid) %></td><td></td></tr></tfoot>
+        </table>
+      <% } %>
+      </div>
+    </section>
+  </div>
+
+  <div class="side-stack">
+    <% if (open && inv.balance > 0) { %>
+    <form method="post" action="<%= here %>/payments" class="panel">
+      <div class="panel-head"><h3>Record payment</h3></div>
+      <div class="panel-body">
+        <%- include('_csrf') %>
+        <div class="field">
+          <label for="amount">Amount received (₹)</label>
+          <input type="text" id="amount" name="amount" inputmode="decimal" required value="<%= inv.balance %>">
+          <div class="hint">Balance due is <%= fmtINR(inv.balance) %>. A part payment is fine.</div>
+        </div>
+        <div class="field">
+          <label for="method">Method</label>
+          <select id="method" name="method">
+            <% Object.keys(PAY_METHODS).forEach(function (k) { %><option value="<%= k %>" <%= k === 'bank_transfer' ? 'selected' : '' %>><%= PAY_METHODS[k] %></option><% }) %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="paid_on">Date received</label>
+          <input type="date" id="paid_on" name="paid_on" value="<%= today %>" max="<%= today %>" required>
+        </div>
+        <div class="field">
+          <label for="reference">Reference</label>
+          <input type="text" id="reference" name="reference" maxlength="200" placeholder="UTR, cheque number or UPI id">
+        </div>
+        <div class="field">
+          <label for="pnote">Note</label>
+          <input type="text" id="pnote" name="note" maxlength="500">
+        </div>
+        <button class="btn" type="submit">Record payment</button>
+      </div>
+    </form>
+    <% } %>
+
+    <% if (open && inv.paid <= 0) { %>
+    <div class="panel">
+      <div class="panel-head"><h3>Cancel invoice</h3></div>
+      <div class="panel-body">
+        <form method="post" action="<%= here %>/cancel">
+          <%- include('_csrf') %>
+          <div class="field">
+            <label for="cnote">Reason</label>
+            <input type="text" id="cnote" name="note" maxlength="500" required placeholder="For example: raised on the wrong bidder">
+            <div class="hint">Only possible while nothing is paid. The number stays used.</div>
+          </div>
+          <button class="btn btn-danger" type="submit" data-confirm="Cancel invoice <%= inv.number %>? This cannot be undone.">Cancel invoice</button>
+        </form>
+      </div>
+    </div>
+    <% } else if (open) { %>
+      <p class="muted small">To cancel this invoice, first remove the payments recorded against it.</p>
+    <% } %>
+  </div>
+</div>

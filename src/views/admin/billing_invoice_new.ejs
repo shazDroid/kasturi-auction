@@ -1,0 +1,59 @@
+<div class="page-head">
+  <div>
+    <h1>New invoice</h1>
+    <p>A tax invoice for any other charge, such as a site visit, a late lifting charge or an earnest money adjustment. GST is split into CGST and SGST or charged as IGST from the bidder's state.</p>
+  </div>
+</div>
+
+<% if (error) { %><div class="notice notice-error"><p><%= error %></p></div><% } %>
+
+<form class="filters" method="get" action="/admin/billing/invoices/new">
+  <label for="bq">Find the bidder</label>
+  <input type="search" id="bq" name="q" value="<%= q %>" placeholder="Name, company, email, GSTIN or bidder no.">
+  <button class="btn btn-quiet" type="submit">Search</button>
+</form>
+
+<form method="post" action="/admin/billing/invoices/new" class="panel">
+  <div class="panel-body">
+    <%- include('_csrf') %>
+    <div class="field">
+      <label for="user_id">Bidder</label>
+      <% if (!matches.length) { %>
+        <p class="muted"><%= q ? 'No bidder matches "' + q + '". Try part of the name or company.' : 'Search for the bidder above first.' %></p>
+        <input type="hidden" name="user_id" value="">
+      <% } else { %>
+        <select id="user_id" name="user_id" required>
+          <% if (matches.length > 1) { %><option value="">Choose a bidder</option><% } %>
+          <% matches.forEach(function (m) { %><option value="<%= m.id %>" <%= String(m.id) === String(form.user_id) ? 'selected' : '' %>><%= m.company_name || m.name %> (<%= bidderNo(m.id) %>, <%= m.name %><%= m.state ? ', ' + m.state : ', no state' %>)</option><% }) %>
+        </select>
+      <% } %>
+    </div>
+
+    <div class="table-wrap flat bl-lines-form">
+      <table class="table">
+        <thead><tr><th>#</th><th>Description</th><th class="num">Quantity</th><th class="num">Rate (₹, before GST)</th></tr></thead>
+        <tbody>
+        <% form.lines.forEach(function (l, i) { %>
+          <tr>
+            <td><%= i + 1 %></td>
+            <td><label class="sr" for="desc_<%= i %>">Line <%= i + 1 %> description</label><input type="text" id="desc_<%= i %>" name="desc_<%= i %>" maxlength="300" value="<%= l.description %>" <%= i === 0 ? 'required' : '' %>></td>
+            <td class="num"><label class="sr" for="qty_<%= i %>">Line <%= i + 1 %> quantity</label><input type="text" class="bl-num" id="qty_<%= i %>" name="qty_<%= i %>" inputmode="decimal" value="<%= l.qty %>" placeholder="<%= i === 0 ? '1' : '' %>"></td>
+            <td class="num"><label class="sr" for="rate_<%= i %>">Line <%= i + 1 %> rate</label><input type="text" class="bl-num" id="rate_<%= i %>" name="rate_<%= i %>" inputmode="decimal" value="<%= l.rate %>"></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    </div>
+    <p class="hint small muted">Fill as many lines as you need and leave the rest empty.</p>
+
+    <div class="form-grid three mt">
+      <div class="field"><label for="gst">GST (%)</label><input type="text" id="gst" name="gst" inputmode="decimal" value="<%= form.gst %>"></div>
+      <div class="field"><label for="due_days">Payment terms (days)</label><input type="text" id="due_days" name="due_days" inputmode="numeric" value="<%= form.due_days %>"></div>
+      <div class="field"><label for="note">Note printed on the invoice</label><input type="text" id="note" name="note" maxlength="1000" value="<%= form.note %>"></div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit" data-confirm="Issue this invoice? It gets the next invoice number and is emailed to the bidder.">Issue invoice</button>
+      <a class="btn btn-quiet" href="/admin/billing/invoices">Cancel</a>
+    </div>
+  </div>
+</form>

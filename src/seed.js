@@ -4,8 +4,9 @@
  *
  *   - default email templates and CMS pages
  *   - the first super admin (from ADMIN_EMAIL / ADMIN_PASSWORD)
- *   - optional demo data when SEED_DEMO=true and there are no auctions yet, and a one-time upgrade of
- *     older demo rows to formatted text and specifications
+ *   - optional demo data when SEED_DEMO=true and there are no auctions yet, a one-time upgrade of
+ *     older demo rows to formatted text and specifications, and the v3 demo groups, sign-up codes
+ *     and restricted auction (added to an existing demo database too)
  */
 const bcrypt = require('bcryptjs');
 const db = require('./db');
@@ -743,6 +744,101 @@ async function seedDemo() {
   if (created) console.log('[seed] Demo data created (bidders trader1..trader8@demo.kasturi.local, password demo12345)');
 }
 
+// ---------------------------------------------------------------------------------------------
+// v3 demo content: bidder groups, sign-up codes, one restricted auction with group start prices.
+// Runs on every boot with SEED_DEMO=true, after seedDemo/upgradeDemo, so it also upgrades a demo
+// database created by an earlier version. Only demo rows are touched (found by the demo emails and
+// the exact demo auction title and seller), and only what is missing is added.
+
+const DEMO_GROUPS = [
+  { name: 'Recyclers', description: 'Registered recyclers and processors with their own melting or refining capacity.', fee_amount: 3000, commission_percent: 1.5 },
+  { name: 'Traders and dealers', description: 'Scrap traders and dealers who buy for resale.', fee_amount: null, commission_percent: 2 },
+  { name: 'Manufacturers and end users', description: 'Foundries, mills and plants buying for their own use.', fee_amount: 7500, commission_percent: 1 },
+];
+// demo bidder email -> group name
+const DEMO_MEMBERS = {
+  'trader1@demo.kasturi.local': 'Traders and dealers',
+  'trader2@demo.kasturi.local': 'Recyclers',
+  'trader3@demo.kasturi.local': 'Manufacturers and end users',
+  'trader4@demo.kasturi.local': 'Traders and dealers',
+  'trader5@demo.kasturi.local': 'Recyclers',
+  'trader6@demo.kasturi.local': 'Traders and dealers',
+  'trader7@demo.kasturi.local': 'Traders and dealers',
+};
+// Codes use only the unambiguous alphabet of the admin generator (no 0, O, 1, I).
+const DEMO_CODES = [
+  { code: 'KA-RCYL-7KQ4', label: 'Al-Noor Metal Recycling, Bhiwandi', group: 'Recyclers', max_uses: 1, used_by: ['trader2@demo.kasturi.local'] },
+  { code: 'KA-MEET-PUN6', label: 'Pune scrap dealers meet, shared code', group: 'Traders and dealers', max_uses: 25, used_by: ['trader4@demo.kasturi.local', 'trader6@demo.kasturi.local'] },
+  { code: 'KA-XPRD-9HWM', label: 'Diwali mailer, not used in time', group: null, max_uses: 5, used_by: [], expired: true },
+  { code: 'KA-NEWB-3RTC', label: 'Spare code for a new manufacturer', group: 'Manufacturers and end users', max_uses: 1, used_by: [] },
+];
+const DEMO_RESTRICTED = { key: 'up2', group: 'Recyclers', invite: 'trader3@demo.kasturi.local', prices: [[1, 182], [2, 152]] };
+const V3_MARK = 'demo_v3_restricted';
+
+async function seedDemoV3() {
+  if (process.env.SEED_DEMO !== 'true') return;
+  // Only for a demo database: the demo bidders must exist.
+  const demoUsers = await db.many(`SELECT id, email, group_id, invite_code_id FROM users WHERE email LIKE '%@demo.kasturi.local'`);
+  if (!demoUsers.length) return;
+  const byEmail = Object.fromEntries(demoUsers.map((u) => [u.email, u]));
+  const added = [];
+
+  await db.tx(async (c) => {
+    await c.query(`SELECT pg_advisory_xact_lock(hashtext('kasturi-seed-demo-v3'))`);
+    const groupId = {};
+    for (const g of DEMO_GROUPS) {
+      const r = await c.query(
+        `INSERT INTO bidder_groups(name, description, fee_amount, commission_percent) VALUES($1,$2,$3,$4)
+         ON CONFLICT (name) DO NOTHING RETURNING id`, [g.name, g.description, g.fee_amount, g.commission_percent]);
+      if (r.rowCount) added.push(`group ${g.name}`);
+      groupId[g.name] = r.rowCount ? r.rows[0].id : (await c.query('SELECT id FROM bidder_groups WHERE name = $1', [g.name])).rows[0].id;
+    }
+    // Demo bidders without a group join theirs.
+    for (const [email, gname] of Object.entries(DEMO_MEMBERS)) {
+      const r = await c.query('UPDATE users SET group_id = $2 WHERE email = $1 AND group_id IS NULL', [email, groupId[gname]]);
+      if (r.rowCount) added.push(`${email} in ${gname}`);
+    }
+    for (const k of DEMO_CODES) {
+      const users = k.used_by.map((e) => byEmail[e]).filter(Boolean);
+      const r = await c.query(
+        `INSERT INTO invite_codes(code, label, group_id, max_uses, used_count, expires_at, created_at)
+         VALUES($1,$2,$3,$4,$5,$6, now() - interval '20 days') ON CONFLICT (code) DO NOTHING RETURNING id`,
+        [k.code, k.label, k.group ? groupId[k.group] : null, k.max_uses, users.length, k.expired ? new Date(Date.now() - 10 * DAY) : null]);
+      if (r.rowCount) added.push(`code ${k.code}`);
+      const codeId = r.rowCount ? r.rows[0].id : (await c.query('SELECT id FROM invite_codes WHERE code = $1', [k.code])).rows[0].id;
+      for (const u of users) await c.query('UPDATE users SET invite_code_id = $2 WHERE id = $1 AND invite_code_id IS NULL', [u.id, codeId]);
+    }
+
+    // One upcoming demo auction restricted to a group, with one extra invited bidder and group start prices.
+    // Done once (marked in settings) so that an admin who later makes it public is not overruled.
+    const def = AUCTIONS.find((x) => x.key === DEMO_RESTRICTED.key);
+    const a = (await c.query(
+      `SELECT a.id, a.visibility,
+              EXISTS (SELECT 1 FROM auction_groups ag WHERE ag.auction_id = a.id)
+              OR EXISTS (SELECT 1 FROM auction_invites ai WHERE ai.auction_id = a.id) AS has_audience
+         FROM auctions a JOIN sellers s ON s.id = a.seller_id
+        WHERE a.title = $1 AND s.name = $2 AND a.starts_at > now() ORDER BY a.id LIMIT 1`, [def.title, SELLERS[def.seller].name])).rows[0];
+    if (!a) return;
+    const marked = (await c.query('SELECT 1 FROM settings WHERE key = $1', [V3_MARK])).rowCount > 0;
+    // Once done, only repair it when it is still restricted but lost its group (for example the group was deleted).
+    if (marked && (a.visibility !== 'restricted' || a.has_audience)) return;
+    await c.query(`UPDATE auctions SET visibility = 'restricted' WHERE id = $1`, [a.id]);
+    await c.query('INSERT INTO auction_groups(auction_id, group_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [a.id, groupId[DEMO_RESTRICTED.group]]);
+    const inv = byEmail[DEMO_RESTRICTED.invite];
+    if (inv) await c.query('INSERT INTO auction_invites(auction_id, user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [a.id, inv.id]);
+    for (const [lotNo, price] of DEMO_RESTRICTED.prices) {
+      await c.query(
+        `INSERT INTO lot_group_prices(lot_id, group_id, start_price)
+         SELECT l.id, $3, $4 FROM lots l WHERE l.auction_id = $1 AND l.lot_no = $2
+            AND NOT EXISTS (SELECT 1 FROM bids b WHERE b.lot_id = l.id)
+         ON CONFLICT DO NOTHING`, [a.id, lotNo, groupId[DEMO_RESTRICTED.group], price]);
+    }
+    await c.query(`INSERT INTO settings(key, value) VALUES($1, '1') ON CONFLICT (key) DO NOTHING`, [V3_MARK]);
+    added.push(`auction #${a.id} restricted to ${DEMO_RESTRICTED.group}`);
+  });
+  if (added.length) console.log(`[seed] Demo v3 data added: ${added.join('; ')}`);
+}
+
 /** Seed defaults. Safe to run on every boot. */
 async function run() {
   await seedTemplates();
@@ -750,6 +846,7 @@ async function run() {
   await seedAdmin();
   await seedDemo();
   await upgradeDemo();
+  await seedDemoV3();
 }
 
 module.exports = { run, PAGES };

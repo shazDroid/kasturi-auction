@@ -14,14 +14,20 @@
     <option value="">All stages</option>
     <% PHASES.forEach(function (p) { %><option value="<%= p %>" <%= phase === p ? 'selected' : '' %>><%= label('phase', p) %></option><% }) %>
   </select>
+  <label class="sr" for="f-vis">Who can see</label>
+  <select id="f-vis" name="vis">
+    <option value="">Public and restricted</option>
+    <option value="public" <%= vis === 'public' ? 'selected' : '' %>>Public only</option>
+    <option value="restricted" <%= vis === 'restricted' ? 'selected' : '' %>>Restricted only</option>
+  </select>
   <button class="btn btn-quiet" type="submit">Filter</button>
-  <% if (q || phase) { %><a href="/admin/auctions">Clear filters</a><% } %>
+  <% if (q || phase || vis) { %><a href="/admin/auctions">Clear filters</a><% } %>
 </form>
 
 <div class="table-wrap">
 <% if (!rows.length) { %>
   <div class="empty">
-    <% if (q || phase) { %>
+    <% if (q || phase || vis) { %>
       <h3>No auctions match these filters</h3><p>Try another search, or <a href="/admin/auctions">show all auctions</a>.</p>
     <% } else { %>
       <h3>No auctions yet</h3><p>Start with <a href="/admin/auctions/new">a new auction</a>. You can add lots once it is saved.</p>
@@ -33,7 +39,7 @@
     <tbody>
     <% rows.forEach(function (a) { %>
       <tr>
-        <td class="cell-main"><a class="primary" href="/admin/auctions/<%= a.id %>"><%= a.title %></a><span class="sub"><%= a.seller_name || 'No seller set' %></span></td>
+        <td class="cell-main"><a class="primary" href="/admin/auctions/<%= a.id %>"><%= a.title %></a><span class="sub"><%= a.seller_name || 'No seller set' %></span><% if (a.visibility === 'restricted') { %><span class="sub"><span class="tag tag-warn">Restricted</span> <%= a.group_names || (a.invite_count ? '' : 'No groups or invites yet') %><%= a.invite_count ? (a.group_names ? ', ' : '') + a.invite_count + ' invited' : '' %></span><% } %></td>
         <td data-label="Starts" class="nowrap"><%= fmtDT(a.starts_at) %></td>
         <td data-label="Ends" class="nowrap"><%= fmtDT(a.ends_at) %></td>
         <td class="num" data-label="Lots"><%= a.lot_count %></td>

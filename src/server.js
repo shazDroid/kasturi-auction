@@ -102,9 +102,13 @@ async function main() {
   io.on('connection', (socket) => {
     const sess = socket.request.session || {};
     if (sess.userId) socket.join('user:' + sess.userId);
-    socket.on('watch', (auctionId) => {
+    // Only join the room of an auction this visitor may see (restricted auctions stay private).
+    socket.on('watch', async (auctionId) => {
       const id = parseInt(auctionId, 10);
-      if (Number.isFinite(id)) socket.join('auction:' + id);
+      if (!Number.isFinite(id)) return;
+      try {
+        if (sess.adminId || await bidding.canSee(id, sess.userId || null)) socket.join('auction:' + id);
+      } catch (e) { /* ignore: the page still polls */ }
     });
   });
   bidding.attach(io);

@@ -68,6 +68,15 @@
         <%- include('_err', { k: 'pincode' }) %>
       </div>
     </div>
+    <div class="field field-narrow">
+      <label for="group_id">Bidder group</label>
+      <select id="group_id" name="group_id">
+        <option value="">No group (default fee and commission)</option>
+        <% groups.forEach(function (g) { %><option value="<%= g.id %>" <%= Number(v.group_id) === g.id ? 'selected' : '' %>><%= g.name %></option><% }) %>
+      </select>
+      <%- include('_err', { k: 'group_id' }) %>
+      <div class="hint">The group sets the registration fee and buyer's commission, and which restricted auctions the bidder sees.</div>
+    </div>
     <div class="check">
       <input type="checkbox" id="email_opt_out" name="email_opt_out" value="1" <%= v.email_opt_out ? 'checked' : '' %>>
       <div><label for="email_opt_out">Do not send auction announcements, reminders or broadcasts</label><div class="hint">Account emails such as receipts and approvals are still sent.</div></div>

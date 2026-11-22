@@ -1,0 +1,70 @@
+<div class="page-head">
+  <div>
+    <h1>Sign-up codes</h1>
+    <p>Give a code to a business you want to bid. It registers with the code and joins the code's group.</p>
+  </div>
+  <a class="btn" href="/admin/codes/new">Generate codes</a>
+</div>
+
+<%- include('_code_notice') %>
+
+<form class="filters" method="get" action="/admin/codes" role="search">
+  <label class="sr" for="f-q">Search</label>
+  <input type="search" id="f-q" name="q" value="<%= f.q %>" placeholder="Code or issued to">
+  <label class="sr" for="f-status">Status</label>
+  <select id="f-status" name="status">
+    <option value="">Any status</option>
+    <% Object.keys(STATUSES).forEach(function (k) { %><option value="<%= k %>" <%= f.status === k ? 'selected' : '' %>><%= STATUSES[k] %> (<%= counts[k] || 0 %>)</option><% }) %>
+  </select>
+  <label class="sr" for="f-group">Group</label>
+  <select id="f-group" name="group">
+    <option value="">Any group</option>
+    <option value="none" <%= f.group === 'none' ? 'selected' : '' %>>No group</option>
+    <% groups.forEach(function (g) { %><option value="<%= g.id %>" <%= f.group === String(g.id) ? 'selected' : '' %>><%= g.name %></option><% }) %>
+  </select>
+  <button class="btn btn-quiet" type="submit">Filter</button>
+  <% if (f.q || f.status || f.group) { %><a href="/admin/codes">Clear filters</a><% } %>
+</form>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty">
+    <% if (f.q || f.status || f.group) { %><h3>No codes match these filters</h3><p>Try another search or <a href="/admin/codes">show all codes</a>.</p>
+    <% } else { %><h3>No sign-up codes yet</h3><p><a href="/admin/codes/new">Generate codes</a> to invite businesses. You can email a code straight from its page.</p><% } %>
+  </div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Code</th><th>Issued to</th><th>Group</th><th class="num">Uses</th><th>Expires</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (c) { %>
+      <tr>
+        <td data-label="Code" class="nowrap"><a class="code ax-code" href="/admin/codes/<%= c.id %>"><%= c.code %></a> <button type="button" class="linkbtn small" data-copy="<%= c.code %>" hidden>Copy</button><span class="sub">Created <%= fmtDate(c.created_at) %></span></td>
+        <td data-label="Issued to" class="ax-issued"><%= c.label || '' %><% if (!c.label) { %><span class="muted">Not noted</span><% } %></td>
+        <td data-label="Group"><% if (c.group_name) { %><a href="/admin/groups/<%= c.group_id %>"><%= c.group_name %></a><% } else { %><span class="muted">None</span><% } %></td>
+        <td class="num" data-label="Uses"><%= c.used_count %> of <%= fmtNum(c.max_uses) %></td>
+        <td data-label="Expires" class="nowrap"><%= c.expires_at ? fmtDate(c.expires_at) : 'No expiry' %></td>
+        <td data-label="Status"><%- include('_code_state', { s: c.state }) %></td>
+        <td class="actions">
+          <% if (c.state === 'active') { %><a href="/admin/codes/<%= c.id %>#email" aria-label="Email code <%= c.code %>">Email</a><% } %>
+          <% if (c.active) { %>
+            <form method="post" action="/admin/codes/<%= c.id %>/deactivate" class="inline-form"><%- include('_csrf') %><input type="hidden" name="back" value="<%= urlWith({}) %>">
+              <button class="linkbtn danger" type="submit">Deactivate</button>
+            </form>
+          <% } else { %>
+            <form method="post" action="/admin/codes/<%= c.id %>/reactivate" class="inline-form"><%- include('_csrf') %><input type="hidden" name="back" value="<%= urlWith({}) %>">
+              <button class="linkbtn" type="submit">Reactivate</button>
+            </form>
+          <% } %>
+          <% if (!c.used_count) { %>
+            <form method="post" action="/admin/codes/<%= c.id %>/delete" class="inline-form"><%- include('_csrf') %><input type="hidden" name="back" value="<%= urlWith({}) %>">
+              <button class="linkbtn danger" type="submit" data-confirm="Delete code <%= c.code %>? It has never been used.">Delete</button>
+            </form>
+          <% } %>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+</div>
+<%- include('_pager') %>

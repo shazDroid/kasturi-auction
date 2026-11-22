@@ -6,12 +6,21 @@ const { fmtINR, fmtDate, bidderNo } = require('./util');
 
 const round2 = (n) => Math.round(n * 100) / 100;
 
-/** Current registration fee from admin settings: { base, tax, total, gstPercent, validityDays }. */
-function feeQuote() {
-  const base = round2(settings.num('fee_amount'));
+/**
+ * Registration fee: { base, tax, total, gstPercent, validityDays }.
+ * baseOverride is a bidder group's own fee; without it the default from Settings applies.
+ */
+function feeQuote(baseOverride) {
+  const base = round2(baseOverride === null || baseOverride === undefined ? settings.num('fee_amount') : Number(baseOverride));
   const gstPercent = settings.num('fee_gst_percent');
   const tax = round2(base * gstPercent / 100);
   return { base, tax, total: round2(base + tax), gstPercent, validityDays: settings.num('fee_validity_days') };
+}
+
+/** The fee this bidder pays, taking their group into account. Always use this for a specific bidder. */
+async function feeQuoteFor(userId) {
+  const g = await db.one('SELECT g.fee_amount, g.name FROM users u LEFT JOIN bidder_groups g ON g.id = u.group_id WHERE u.id = $1', [userId]);
+  return { ...feeQuote(g ? g.fee_amount : null), groupName: g ? g.name : null };
 }
 
 /** Whether a bidder's registration fee is currently valid. */
@@ -22,7 +31,7 @@ const feeActive = (user) => !!user.fee_paid_until && new Date(user.fee_paid_unti
  * Returns { payment, order } where order.id goes to Razorpay Checkout.
  */
 async function createFeeOrder(user) {
-  const q = feeQuote();
+  const q = await feeQuoteFor(user.id);
   if (q.total <= 0) throw new Error('Registration fee is not configured');
   const order = await razorpay.createOrder({
     amountPaise: Math.round(q.total * 100),
@@ -60,7 +69,7 @@ async function markPaidByOrder(rpOrderId, rpPaymentId) {
 
 /** Record a fee received outside the gateway (NEFT, cheque, cash). Admin action. */
 async function recordOffline(userId, note) {
-  const q = feeQuote();
+  const q = await feeQuoteFor(userId);
   const payment = await db.tx(async (c) => {
     const p = (await c.query(
       `INSERT INTO payments(user_id, base_amount, tax_amount, amount, method, status, note, paid_at)
@@ -93,6 +102,8 @@ const revokeFee = (userId) => db.query('UPDATE users SET fee_paid_until = NULL W
 const validUntilText = (d) => (!d ? '' : new Date(d).getFullYear() > 2900 ? 'No expiry' : fmtDate(d));
 
 async function sendReceipt(paymentId) {
+  // Raise the tax invoice for this payment (billing module); never let a billing error block the receipt.
+  try { await require('./billing').invoiceForFeePayment(paymentId); } catch (e) { if (e.code !== 'MODULE_NOT_FOUND') console.error('fee invoice', e.message); }
   const r = await db.one(
     `SELECT p.*, u.name, u.email, u.company_name, u.fee_paid_until FROM payments p JOIN users u ON u.id = p.user_id WHERE p.id = $1`, [paymentId]
   );
@@ -106,4 +117,4 @@ async function sendReceipt(paymentId) {
   await mailer.notifyAdmin('fee_paid_admin', { bidder_name: r.name, company: r.company_name, amount: vars.amount, payment_ref: vars.payment_ref });
 }
 
-module.exports = { feeQuote, feeActive, createFeeOrder, markPaidByOrder, recordOffline, revokeFee, validUntilText };
+module.exports = { feeQuote, feeQuoteFor, feeActive, createFeeOrder, markPaidByOrder, recordOffline, revokeFee, validUntilText };

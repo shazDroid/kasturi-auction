@@ -1,6 +1,7 @@
 const express = require('express');
 const db = require('../db');
 const { wrap } = require('../middleware');
+const { visibleSql } = require('../lib/bidding');
 
 const router = express.Router();
 
@@ -14,14 +15,19 @@ router.get('/media/:id', wrap(async (req, res) => {
   const id = parseInt(req.params.id, 10);
   if (!Number.isFinite(id)) return res.status(404).end();
   if (!req.admin) {
+    // $2 is the signed-in bidder (0 for visitors): files of restricted auctions need access to the auction.
+    const uid = req.user ? req.user.id : 0;
+    const vis = visibleSql(2);
     const ok = await db.one(
-      `SELECT 1 FROM auctions a WHERE a.status = 'published' AND a.cover_id = $1
+      `SELECT 1 FROM auctions a WHERE a.status = 'published' AND a.cover_id = $1 AND ${vis}
+       UNION ALL SELECT 1 FROM auction_images ai2 JOIN auctions a ON a.id = ai2.auction_id
+                  WHERE a.status = 'published' AND ai2.file_id = $1 AND ${vis}
        UNION ALL SELECT 1 FROM lot_images li JOIN lots l ON l.id = li.lot_id JOIN auctions a ON a.id = l.auction_id
-                  WHERE a.status = 'published' AND li.file_id = $1
+                  WHERE a.status = 'published' AND li.file_id = $1 AND ${vis}
        UNION ALL SELECT 1 FROM auction_documents d JOIN auctions a ON a.id = d.auction_id
-                  WHERE a.status = 'published' AND d.file_id = $1
-       UNION ALL SELECT 1 FROM sellers s WHERE s.logo_id = $1
-       LIMIT 1`, [id]);
+                  WHERE a.status = 'published' AND d.file_id = $1 AND ${vis}
+       UNION ALL SELECT 1 FROM sellers s WHERE s.logo_id = $1 AND $2::int IS NOT NULL
+       LIMIT 1`, [id, uid]);
     if (!ok) return res.status(404).end();
   }
   const thumb = req.query.size === 'thumb';
@@ -32,7 +38,7 @@ router.get('/media/:id', wrap(async (req, res) => {
   res.set('X-Content-Type-Options', 'nosniff');
   res.set('Content-Disposition', `${isImg || f.mime === 'application/pdf' ? 'inline' : 'attachment'}; filename="${f.filename.replace(/[^\w.\- ]/g, '_')}"`);
   // File ids are never reused and stored files are never modified, so they can be cached hard.
-  res.set('Cache-Control', req.admin ? 'private, max-age=3600' : 'public, max-age=604800, immutable');
+  res.set('Cache-Control', req.admin || req.user ? 'private, max-age=86400' : 'public, max-age=604800, immutable');
   res.send(f.data);
 }));
 

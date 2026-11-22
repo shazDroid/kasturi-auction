@@ -5,9 +5,10 @@
 <div class="page-head">
   <div>
     <h1><%= a.title %></h1>
-    <p class="row"><%- tag('phase', a.phase) %> <span><%= a.seller_name || 'No seller set' %><%= a.location ? ', ' + a.location : '' %></span></p>
+    <p class="row"><%- tag('phase', a.phase) %><% if (a.visibility === 'restricted') { %> <span class="tag tag-warn">Restricted</span><% } %> <span><%= a.seller_name || 'No seller set' %><%= a.location ? ', ' + a.location : '' %></span></p>
   </div>
   <div class="row">
+    <a class="btn btn-accent" href="/auctions/<%= a.id %>" target="_blank" rel="noopener">Preview as bidder</a>
     <a class="btn btn-quiet" href="/admin/auctions/<%= a.id %>/edit">Edit auction</a>
     <% if (canAddLots) { %><a class="btn" href="/admin/auctions/<%= a.id %>/lots/new">Add lot</a><% } %>
   </div>
@@ -17,6 +18,17 @@
   <div class="notice notice-warn"><p>This auction is a draft and bidders cannot see it.<%= a.lot_count ? ' Publish it when the lots and dates are final.' : ' Add at least one lot, then publish it.' %></p></div>
 <% } else if (a.status === 'cancelled') { %>
   <div class="notice notice-error"><p>This auction is cancelled. Bidding is stopped and bidders cannot see it.</p></div>
+<% } %>
+
+<% if (aud.previewGroups.length) { %>
+<form method="get" action="/auctions/<%= a.id %>" target="_blank" class="filters ax-preview-as">
+  <label for="as_group">Preview as group</label>
+  <select id="as_group" name="as_group">
+    <% aud.previewGroups.forEach(function (g) { %><option value="<%= g.id %>"><%= g.name %></option><% }) %>
+  </select>
+  <button class="btn btn-quiet btn-sm" type="submit">Open preview</button>
+  <span class="muted small">Shows the auction with that group's start prices<%= a.visibility === 'restricted' ? ' and what its members can see' : '' %>.</span>
+</form>
 <% } %>
 
 <div class="panel">
@@ -33,7 +45,8 @@
     <% } %>
     <% if (a.status === 'published' && a.phase !== 'closed') { %>
       <form method="post" action="/admin/auctions/<%= a.id %>/announce" class="inline-form"><%- include('_csrf') %>
-        <button class="btn btn-quiet btn-sm" type="submit" data-confirm="<%= a.announced_at ? 'This auction was already announced on ' + fmtDT(a.announced_at) + '. Email all bidders again?' : 'Email this auction to all bidders with a verified email?' %>">Email announcement to bidders</button>
+        <% var who = aud.mailCount + ' bidder' + (aud.mailCount === 1 ? '' : 's') + (a.visibility === 'restricted' ? ' who can see this restricted auction' : ' with a verified email and announcements turned on'); %>
+        <button class="btn btn-quiet btn-sm" type="submit" <%= aud.mailCount ? '' : 'disabled' %> title="<%= aud.mailCount ? 'Sends to ' + who : 'Nobody to email' %>" data-confirm="<%= a.announced_at ? 'This auction was already announced on ' + fmtDT(a.announced_at) + '. Email ' + who + ' again?' : 'Email this auction to ' + who + '?' %>">Email announcement to <%= aud.mailCount %> bidder<%= aud.mailCount === 1 ? '' : 's' %></button>
       </form>
     <% } %>
     <form method="post" action="/admin/auctions/<%= a.id %>/duplicate" class="inline-form"><%- include('_csrf') %>
@@ -61,9 +74,9 @@
     <div class="ax-overview-cover">
       <% if (a.cover_id) { %>
         <a href="/media/<%= a.cover_id %>" target="_blank" rel="noopener"><img src="/media/<%= a.cover_id %>?size=thumb" alt="Cover photo of this auction" width="320" height="240"></a>
-        <a class="small" href="/admin/auctions/<%= a.id %>/edit">Change cover photo</a>
+        <a class="small" href="/admin/auctions/<%= a.id %>/edit#photos"><%= a.photo_count === 1 ? '1 photo' : a.photo_count + ' photos' %>, manage photos</a>
       <% } else { %>
-        <a class="ax-cover-empty" href="/admin/auctions/<%= a.id %>/edit"><span>No cover photo</span><span class="small">Add one on the edit page</span></a>
+        <a class="ax-cover-empty" href="/admin/auctions/<%= a.id %>/edit#photos"><span>No photos</span><span class="small">Add them on the edit page</span></a>
       <% } %>
     </div>
     <dl class="kv">
@@ -81,9 +94,94 @@
       <dt>Bids</dt><dd><%= fmtNum(a.bid_count) %> from <%= a.bidder_count %> bidder<%= a.bidder_count === 1 ? '' : 's' %></dd>
       <dt>Announced</dt><dd><%= a.announced_at ? fmtDT(a.announced_at) : 'Not yet' %></dd>
       <dt>Reminder email</dt><dd><%= a.reminder_sent ? 'Sent' : (S.reminder_minutes_before !== '0' ? 'Sent ' + S.reminder_minutes_before + ' min before start' : 'Turned off in settings') %></dd>
-      <dt>Public page</dt><dd><% if (a.status === 'published') { %><a href="/auctions/<%= a.id %>" target="_blank" rel="noopener">Open auction page</a><% } else { %><span class="muted">Visible after publishing</span><% } %></dd>
+      <dt>Public page</dt><dd><a href="/auctions/<%= a.id %>" target="_blank" rel="noopener"><%= a.status === 'published' ? 'Open auction page' : 'Preview auction page' %></a><% if (a.status !== 'published') { %><span class="sub muted small">Bidders see it after publishing</span><% } %></dd>
+      <dt>Who can see it</dt><dd><%= a.visibility === 'restricted' ? 'Restricted, ' + aud.total + ' bidder' + (aud.total === 1 ? '' : 's') : 'Public, all bidders' %> <a class="small" href="#audience">Details</a></dd>
       <dt>Description</dt><dd><%= a.description ? excerpt(a.description, 90) : 'Not written yet' %></dd>
     </dl>
+  </div>
+</div>
+
+<div class="panel" id="audience">
+  <div class="panel-head">
+    <h3>Who can see and bid</h3>
+    <span class="row"><% if (a.visibility === 'restricted') { %><span class="tag tag-warn">Restricted</span><% } else { %><span class="tag">Public</span><% } %><a class="small" href="/admin/auctions/<%= a.id %>/edit#visibility">Change</a></span>
+  </div>
+  <div class="panel-body">
+    <% if (a.visibility !== 'restricted') { %>
+      <p>Every visitor can see this auction and every eligible bidder can bid. <%= aud.total %> registered bidder<%= aud.total === 1 ? '' : 's' %> (not blocked). <%= aud.mailCount %> of them receive announcement emails.</p>
+      <% if (aud.invites.length) { %><p class="muted small"><%= aud.invites.length %> bidder<%= aud.invites.length === 1 ? ' is' : 's are' %> on the invited list from when the auction was restricted. The list only applies when it is restricted again.</p><% } %>
+    <% } else { %>
+      <% if (!aud.total) { %>
+        <div class="notice notice-error" role="alert"><p>Nobody can see this auction yet. <%= aud.groups.length ? 'Its groups have no bidders.' : 'It has no groups and no invited bidders.' %> <a href="/admin/auctions/<%= a.id %>/edit#visibility">Tick a group</a> or invite bidders below.</p></div>
+      <% } else { %>
+        <p><b><%= aud.total %> bidder<%= aud.total === 1 ? '' : 's' %></b> can see this auction: members of its groups plus invited bidders, not counting blocked accounts. <%= aud.mailCount %> of them receive announcement emails.</p>
+      <% } %>
+      <dl class="kv ax-kv-wide">
+        <dt>Groups</dt>
+        <dd><% if (!aud.groups.length) { %><span class="muted">None</span><% } else { aud.groups.forEach(function (g, i) { %><%= i ? ', ' : '' %><a href="/admin/groups/<%= g.id %>"><%= g.name %></a> <span class="muted">(<%= g.members %>)</span><% }) } %></dd>
+        <dt>Invited bidders</dt><dd><%= aud.invites.length || 'None' %></dd>
+      </dl>
+    <% } %>
+
+    <% if (a.visibility === 'restricted' || aud.invites.length) { %>
+    <h4 class="ax-subhead">Invited bidders</h4>
+    <% if (aud.invites.length) { %>
+      <div class="table-wrap flat">
+        <table class="table table-stack">
+          <thead><tr><th>Bidder</th><th>Email</th><th>Group</th><th></th></tr></thead>
+          <tbody>
+          <% aud.invites.forEach(function (u) { %>
+            <tr>
+              <td class="cell-main"><a class="primary" href="/admin/bidders/<%= u.id %>"><%= u.company_name || u.name %></a><span class="sub"><%= u.company_name ? u.name + ', ' : '' %><%= bidderNo(u.id) %></span><% if (u.blocked) { %> <span class="tag tag-bad">Blocked</span><% } %></td>
+              <td data-label="Email"><%= u.email %></td>
+              <td data-label="Group"><%= u.group_name || 'None' %><% if (u.via_group) { %><span class="sub">Can also see it through this group</span><% } %></td>
+              <td class="actions">
+                <form method="post" action="/admin/auctions/<%= a.id %>/invites/<%= u.id %>/delete" class="inline-form"><%- include('_csrf') %>
+                  <button class="linkbtn danger" type="submit" data-confirm="Remove the invitation of <%= u.name %>?">Remove</button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } else { %>
+      <p class="muted small">No bidders are invited individually.</p>
+    <% } %>
+
+    <form class="filters mt" method="get" action="/admin/auctions/<%= a.id %>#audience" role="search">
+      <label for="invite-q">Invite bidders</label>
+      <input type="search" id="invite-q" name="invite_q" value="<%= aud.inviteQ %>" placeholder="Name, company, email or KA number">
+      <button class="btn btn-quiet btn-sm" type="submit">Search</button>
+      <% if (aud.inviteQ) { %><a href="/admin/auctions/<%= a.id %>#audience">Clear</a><% } %>
+    </form>
+    <% if (aud.results) { %>
+      <% if (!aud.results.length) { %>
+        <p class="muted small">No bidders match "<%= aud.inviteQ %>" who are not invited already.</p>
+      <% } else { %>
+      <form method="post" action="/admin/auctions/<%= a.id %>/invites">
+        <%- include('_csrf') %>
+        <div class="table-wrap flat">
+          <table class="table table-stack">
+            <thead><tr><th class="ax-check-cell"><input type="checkbox" data-select-all="user_ids" aria-label="Select all bidders found" hidden></th><th>Bidder</th><th>Email</th><th>Group</th></tr></thead>
+            <tbody>
+            <% aud.results.slice(0, SEARCH_LIMIT).forEach(function (u) { %>
+              <tr>
+                <td class="ax-check-cell"><input type="checkbox" name="user_ids" value="<%= u.id %>" id="inv-<%= u.id %>"></td>
+                <td class="cell-main"><label for="inv-<%= u.id %>" class="ax-row-label"><b><%= u.company_name || u.name %></b><span class="sub"><%= u.company_name ? u.name + ', ' : '' %><%= bidderNo(u.id) %><%= u.city ? ', ' + u.city : '' %></span></label><% if (u.blocked) { %> <span class="tag tag-bad">Blocked</span><% } %></td>
+                <td data-label="Email"><%= u.email %></td>
+                <td data-label="Group"><%= u.group_name || 'None' %><% if (u.via_group && a.visibility === 'restricted') { %><span class="sub">Can already see it through this group</span><% } %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <% if (aud.results.length > SEARCH_LIMIT) { %><p class="muted small">Showing the first <%= SEARCH_LIMIT %> matches. Narrow the search to find others.</p><% } %>
+        <div class="form-actions mt"><button class="btn btn-sm" type="submit">Invite selected bidders</button></div>
+      </form>
+      <% } %>
+    <% } %>
+    <% } %>
   </div>
 </div>
 

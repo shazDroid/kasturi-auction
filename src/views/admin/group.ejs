@@ -1,0 +1,160 @@
+<div class="page-head">
+  <div>
+    <h1><%= g.name %></h1>
+    <p><%= g.description || 'Bidder group' %></p>
+  </div>
+  <div class="row">
+    <a class="btn btn-quiet" href="/admin/groups/<%= g.id %>/edit">Edit group</a>
+    <a class="btn btn-quiet" href="/admin/codes/new?group=<%= g.id %>">Generate sign-up codes</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-body">
+    <dl class="kv ax-kv-wide">
+      <dt>Registration fee</dt><dd><%= g.fee_amount === null ? 'Default, ' + fmtINR(D.fee) : fmtINR(g.fee_amount) %> <span class="muted">before GST</span></dd>
+      <dt>Buyer's commission</dt><dd><%= g.commission_percent === null ? 'Default, ' + fmtNum(D.commission) + '%' : fmtNum(g.commission_percent) + '%' %></dd>
+      <dt>Bidders</dt><dd><%= fmtNum(g.member_count) %></dd>
+      <dt>Group start prices</dt><dd><%= g.price_count ? g.price_count + ' lot' + (g.price_count === 1 ? '' : 's') + ' open at a different price for this group' : 'None' %></dd>
+    </dl>
+  </div>
+</div>
+
+<section class="admin-section" id="members">
+  <div class="row-between"><h2>Bidders in this group</h2><% if (members.length) { %><a href="/admin/bidders?group=<%= g.id %>">Open in the bidders list</a><% } %></div>
+  <div class="table-wrap">
+  <% if (!members.length) { %>
+    <div class="empty"><h3>No bidders in this group</h3><p>Search for bidders below and add them, or <a href="/admin/codes/new?group=<%= g.id %>">generate sign-up codes</a> that put new registrations straight into this group.</p></div>
+  <% } else { %>
+    <table class="table table-stack">
+      <thead><tr><th>Bidder no</th><th>Bidder</th><th>Email</th><th>City</th><th>Documents</th><th></th></tr></thead>
+      <tbody>
+      <% members.forEach(function (u) { %>
+        <tr>
+          <td data-label="Bidder no" class="nowrap"><span class="code"><%= bidderNo(u.id) %></span></td>
+          <td class="cell-main"><a class="primary" href="/admin/bidders/<%= u.id %>"><%= u.company_name || u.name %></a><span class="sub"><%= u.company_name ? u.name : 'No company entered' %></span><% if (u.blocked) { %> <span class="tag tag-bad">Blocked</span><% } %></td>
+          <td data-label="Email"><%= u.email %></td>
+          <td data-label="City"><%= u.city %></td>
+          <td data-label="Documents"><%- tag('kyc', u.kyc_status) %></td>
+          <td class="actions">
+            <form method="post" action="/admin/groups/<%= g.id %>/members/<%= u.id %>/remove" class="inline-form"><%- include('_csrf') %>
+              <button class="linkbtn danger" type="submit" data-confirm="Remove <%= u.name %> from <%= g.name %>? The default fee and commission will apply to them.">Remove</button>
+            </form>
+          </td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  <% } %>
+  </div>
+</section>
+
+<section class="admin-section" id="add">
+  <h2>Add bidders</h2>
+  <form class="filters" method="get" action="/admin/groups/<%= g.id %>#add" role="search">
+    <label class="sr" for="add-q">Search bidders</label>
+    <input type="search" id="add-q" name="q" value="<%= q %>" placeholder="Name, company, email or KA number">
+    <button class="btn btn-quiet" type="submit">Search</button>
+    <% if (q) { %><a href="/admin/groups/<%= g.id %>#add">Clear</a><% } %>
+  </form>
+  <% if (results) { %>
+    <% if (!results.length) { %>
+      <p class="muted">No bidders outside this group match "<%= q %>". Check the spelling or search by email.</p>
+    <% } else { %>
+    <form method="post" action="/admin/groups/<%= g.id %>/members">
+      <%- include('_csrf') %>
+      <div class="table-wrap">
+        <table class="table table-stack">
+          <thead><tr><th class="ax-check-cell"><input type="checkbox" data-select-all="user_ids" aria-label="Select all bidders found" hidden></th><th>Bidder</th><th>Email</th><th>City</th><th>Current group</th></tr></thead>
+          <tbody>
+          <% results.slice(0, SEARCH_LIMIT).forEach(function (u) { %>
+            <tr>
+              <td class="ax-check-cell"><input type="checkbox" name="user_ids" value="<%= u.id %>" id="add-<%= u.id %>"></td>
+              <td class="cell-main"><label for="add-<%= u.id %>" class="ax-row-label"><b><%= u.company_name || u.name %></b><span class="sub"><%= u.company_name ? u.name + ', ' : '' %><%= bidderNo(u.id) %></span></label></td>
+              <td data-label="Email"><%= u.email %></td>
+              <td data-label="City"><%= u.city %></td>
+              <td data-label="Current group"><%= u.group_name || 'None' %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+      <% if (results.length > SEARCH_LIMIT) { %><p class="muted small mt">Showing the first <%= SEARCH_LIMIT %> matches. Narrow the search to find others.</p><% } %>
+      <div class="form-actions mt"><button class="btn" type="submit">Add selected bidders to <%= g.name %></button><span class="muted small">Bidders already in another group are moved to this one.</span></div>
+    </form>
+    <% } %>
+  <% } else { %>
+    <p class="muted small">Search to find bidders, tick them and add them. To move many bidders at once, use the bidders list.</p>
+  <% } %>
+</section>
+
+<div class="cols-even admin-section">
+  <section>
+    <div class="row-between section-head"><h2>Restricted auctions</h2></div>
+    <div class="table-wrap">
+    <% if (!auctions.length) { %>
+      <div class="empty"><h3>No restricted auctions use this group</h3><p>On an auction's edit page, choose "Restricted" and tick this group to let only its bidders see it.</p></div>
+    <% } else { %>
+      <table class="table table-stack">
+        <thead><tr><th>Auction</th><th>Starts</th><th>Stage</th></tr></thead>
+        <tbody>
+        <% auctions.forEach(function (a) { %>
+          <tr>
+            <td class="cell-main"><a class="primary" href="/admin/auctions/<%= a.id %>"><%= a.title %></a><% if (a.visibility !== 'restricted') { %><span class="sub">Now public, so this group setting has no effect</span><% } %></td>
+            <td data-label="Starts" class="nowrap"><%= fmtDT(a.starts_at) %></td>
+            <td data-label="Stage"><%- tag('phase', a.phase) %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+    </div>
+  </section>
+  <section>
+    <div class="row-between section-head"><h2>Sign-up codes</h2><a href="/admin/codes?group=<%= g.id %>">All codes for this group</a></div>
+    <div class="table-wrap">
+    <% if (!codes.length) { %>
+      <div class="empty"><h3>No sign-up codes for this group</h3><p><a href="/admin/codes/new?group=<%= g.id %>">Generate codes</a>. Businesses that register with one join this group automatically.</p></div>
+    <% } else { %>
+      <table class="table table-stack">
+        <thead><tr><th>Code</th><th>Issued to</th><th class="num">Uses</th><th>Status</th></tr></thead>
+        <tbody>
+        <% codes.forEach(function (c) { %>
+          <tr>
+            <td data-label="Code" class="nowrap"><a href="/admin/codes/<%= c.id %>" class="code ax-code"><%= c.code %></a></td>
+            <td data-label="Issued to"><%= c.label || '' %></td>
+            <td class="num" data-label="Uses"><%= c.used_count %> of <%= c.max_uses %></td>
+            <td data-label="Status"><%- include('_code_state', { s: c.state }) %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+    </div>
+  </section>
+</div>
+
+<div class="panel admin-section" id="delete">
+  <div class="panel-head"><h3>Delete this group</h3></div>
+  <div class="panel-body">
+    <form method="post" action="/admin/groups/<%= g.id %>/delete">
+      <%- include('_csrf') %>
+      <% if (g.member_count) { %>
+        <p><%= g.name %> has <%= g.member_count %> bidder<%= g.member_count === 1 ? '' : 's' %>. Choose where to move them before the group is deleted.</p>
+        <div class="field field-narrow">
+          <label for="move_to">Move bidders to another group</label>
+          <select id="move_to" name="move_to" required>
+            <option value="">Choose a group</option>
+            <% others.forEach(function (o) { %><option value="<%= o.id %>"><%= o.name %></option><% }) %>
+            <option value="none">No group (default fee and commission)</option>
+          </select>
+        </div>
+      <% } else { %>
+        <p class="muted">The group has no bidders, so it can be deleted.</p>
+      <% } %>
+      <% var effects = []; if (g.auction_count) effects.push(g.auction_count + ' restricted auction(s) lose this group'); if (g.price_count) effects.push(g.price_count + ' group start price(s) are removed'); if (g.code_count) effects.push(g.code_count + ' sign-up code(s) stop adding bidders to a group'); %>
+      <% if (effects.length) { %><p class="small muted">Deleting it also means: <%= effects.join('; ') %>.</p><% } %>
+      <button class="btn btn-danger btn-sm" type="submit" data-confirm="Delete the group <%= g.name %>? This cannot be undone.">Delete group</button>
+    </form>
+  </div>
+</div>

@@ -132,7 +132,7 @@
       var wrong = accept.length ? files.filter(function (f) { return accept.indexOf(f.type) < 0; }).map(function (f) { return '"' + f.name + '"'; }) : [];
       if (wrong.length) problem = wrong.join(', ') + (wrong.length === 1 ? ' is not' : ' are not') + ' an accepted file type. ' + (input.multiple || input.name === 'cover' || input.name === 'logo' ? 'Choose JPG, PNG or WebP photos.' : 'Choose a PDF, JPG, PNG or WebP file.');
       else if (big.length) problem = big.join(', ') + (big.length === 1 ? ' is' : ' are') + ' larger than 8 MB. Choose a smaller file.';
-      else if (maxFiles && files.length > maxFiles) problem = 'You chose ' + files.length + ' photos, but only ' + maxFiles + ' more can be added to this lot.';
+      else if (maxFiles && files.length > maxFiles) problem = 'You chose ' + files.length + ' photos, but only ' + maxFiles + ' more can be added to this ' + (input.getAttribute('data-max-what') || 'lot') + '.';
       input.setCustomValidity(problem);
       msg.textContent = problem;
       if (problem) input.insertAdjacentElement('afterend', msg); else if (msg.parentNode) msg.remove();
@@ -170,6 +170,246 @@
       if (input.validationMessage) { e.preventDefault(); input.focus(); }
     });
   });
+
+  // ---------- Tick-all checkbox: <input type=checkbox data-select-all="fieldName"> ----------
+  document.querySelectorAll('input[data-select-all]').forEach(function (all) {
+    var name = all.getAttribute('data-select-all');
+    var scope = all.form || all.closest('form') || all.closest('table') || document;
+    var boxes = function () {
+      var formId = all.getAttribute('form');
+      var sel = 'input[type=checkbox][name="' + name + '"]';
+      return Array.prototype.slice.call((formId ? document : scope).querySelectorAll(sel)).filter(function (b) {
+        return b !== all && (!formId || b.getAttribute('form') === formId);
+      });
+    };
+    all.hidden = false;
+    var sync = function () {
+      var list = boxes();
+      var on = list.filter(function (b) { return b.checked; }).length;
+      all.checked = list.length > 0 && on === list.length;
+      all.indeterminate = on > 0 && on < list.length;
+    };
+    all.addEventListener('change', function () { boxes().forEach(function (b) { b.checked = all.checked; }); sync(); });
+    boxes().forEach(function (b) { b.addEventListener('change', sync); });
+    sync();
+  });
+
+  // ---------- Copy buttons: data-copy="text" or data-copy-from="elementId" ----------
+  var copyText = function (text, done) {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(done, function () { done(false); });
+      return;
+    }
+    var ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    ta.remove();
+    done(ok);
+  };
+  document.querySelectorAll('[data-copy], [data-copy-from]').forEach(function (btn) {
+    btn.hidden = false;
+    var label = btn.textContent;
+    btn.addEventListener('click', function () {
+      var src = btn.getAttribute('data-copy-from');
+      var el = src && document.getElementById(src);
+      var text = el ? el.value || el.textContent : btn.getAttribute('data-copy');
+      copyText(text, function (ok) {
+        btn.textContent = ok === false ? 'Select and copy' : 'Copied';
+        if (ok === false && el && el.select) el.select();
+        setTimeout(function () { btn.textContent = label; }, 1800);
+      });
+    });
+  });
+
+  // ---------- Helpers for the live previews ----------
+  var TZ = 'Asia/Kolkata';
+  var nf = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
+  var nf3 = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 3 });
+  var money = function (v) {
+    var s = String(v || '').replace(/[,\s₹]/g, '');
+    return /^\d+(\.\d{1,2})?$/.test(s) && Number(s) > 0 ? Number(s) : null;
+  };
+  var inr = function (n) { return '₹' + nf.format(n); };
+  var dtParts = function (d, opts) {
+    var o = {};
+    new Intl.DateTimeFormat('en-IN', Object.assign({ timeZone: TZ }, opts)).formatToParts(d).forEach(function (p) { o[p.type] = p.value; });
+    return o;
+  };
+  var timeText = function (d) { return new Intl.DateTimeFormat('en-IN', { timeZone: TZ, hour: 'numeric', minute: '2-digit', hour12: true }).format(d).toLowerCase(); };
+  var dayKey = function (d) { var p = dtParts(d, { year: 'numeric', month: '2-digit', day: '2-digit' }); return p.year + p.month + p.day; };
+  // datetime-local values are typed in IST.
+  var parseIST = function (v) {
+    if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(v || '')) return null;
+    var d = new Date(v.slice(0, 16) + ':00+05:30');
+    return isNaN(d) ? null : d;
+  };
+  var show = function (el, on) { if (el) el.hidden = !on; };
+  var readFirstImage = function (input, cb) {
+    var f = input && input.files && Array.prototype.slice.call(input.files).filter(function (x) { return /^image\/(jpeg|png|webp)$/.test(x.type) && x.size <= MAX_BYTES; })[0];
+    if (!f) { cb(null); return; }
+    var r = new FileReader();
+    r.onload = function () { cb(r.result); };
+    r.readAsDataURL(f);
+  };
+
+  // ---------- Auction form: who can see it ----------
+  var visRadios = document.querySelectorAll('input[name=visibility]');
+  if (visRadios.length) {
+    var pick = document.querySelector('[data-show-for="restricted"]');
+    var nobody = document.querySelector('[data-nobody]');
+    var syncVis = function () {
+      var restricted = (document.querySelector('input[name=visibility]:checked') || {}).value === 'restricted';
+      if (pick) pick.classList.toggle('hide', !restricted);
+      if (nobody) {
+        var ticked = document.querySelectorAll('input[name=group_ids]:checked').length;
+        var invites = Number(nobody.getAttribute('data-invites')) || 0;
+        nobody.hidden = !(restricted && !ticked && !invites);
+      }
+    };
+    visRadios.forEach(function (r) { r.addEventListener('change', syncVis); });
+    document.querySelectorAll('input[name=group_ids]').forEach(function (c) { c.addEventListener('change', syncVis); });
+    syncVis();
+  }
+
+  // ---------- Auction form: live card preview ----------
+  var card = document.querySelector('[data-card-preview]');
+  if (card) {
+    var form = document.getElementById('auction-form');
+    var pv = function (k) { return card.querySelector('[data-pv="' + k + '"]'); };
+    var val = function (id) { var el = form.elements[id]; return el ? String(el.value || '').trim() : ''; };
+    var uploaded = null; // data URL of the first chosen photo
+    var render = function () {
+      pv('title').textContent = val('title') || 'Auction title';
+      var cat = val('category');
+      pv('category').textContent = cat;
+      show(pv('category-row'), !!cat);
+      var sel = form.elements.seller_id;
+      var seller = sel && sel.value ? sel.options[sel.selectedIndex].text.replace(/ \(inactive\)$/, '') : '';
+      pv('seller').textContent = seller;
+      show(pv('seller-row'), !!seller);
+      pv('location').textContent = val('location');
+      show(pv('location-row'), !!val('location'));
+
+      var s = form.elements.starts_at ? parseIST(val('starts_at')) : (card.getAttribute('data-starts') ? new Date(card.getAttribute('data-starts')) : null);
+      var e = form.elements.ends_at ? parseIST(val('ends_at')) : (card.getAttribute('data-ends') ? new Date(card.getAttribute('data-ends')) : null);
+      var when = 'Set the bidding window';
+      if (s) {
+        var p = dtParts(s, { weekday: 'short', day: 'numeric', month: 'short' });
+        when = p.weekday + ' ' + p.day + ' ' + p.month + ', ' + timeText(s);
+        if (e && e > s) {
+          if (dayKey(s) === dayKey(e)) when += ' to ' + timeText(e);
+          else { var q = dtParts(e, { day: 'numeric', month: 'short' }); when += ' to ' + q.day + ' ' + q.month + ', ' + timeText(e); }
+        }
+      }
+      pv('when').textContent = when;
+      var lots = Number(card.getAttribute('data-lots')) || 0;
+      pv('lots').textContent = lots ? lots + (lots === 1 ? ' lot' : ' lots') : 'Lots are added after saving';
+
+      var now = Date.now();
+      var phase = !s || now < s.getTime() ? 'upcoming' : (e && now < e.getTime() ? 'live' : 'closed');
+      var tagEl = pv('phase');
+      tagEl.className = 'tag' + (phase === 'live' ? ' tag-live' : phase === 'upcoming' ? ' tag-upcoming' : '');
+      tagEl.textContent = phase === 'live' ? 'Live' : phase === 'upcoming' ? 'Upcoming' : 'Closed';
+      var status = val('status');
+      if (status === 'draft') { tagEl.className = 'tag'; tagEl.textContent = 'Draft'; }
+      if (status === 'cancelled') { tagEl.className = 'tag tag-bad'; tagEl.textContent = 'Cancelled'; }
+      var restricted = (form.querySelector('input[name=visibility]:checked') || {}).value === 'restricted';
+      show(pv('restricted'), restricted);
+      pv('foot-label').textContent = phase === 'live' ? 'Closes' : phase === 'upcoming' ? 'Starts' : 'Closed on';
+      var footDate = phase === 'upcoming' ? s : e;
+      pv('foot-value').textContent = footDate ? (function () { var r = dtParts(footDate, { day: 'numeric', month: 'short' }); return r.day + ' ' + r.month + ', ' + timeText(footDate); })() : '';
+      pv('foot-btn').textContent = phase === 'live' ? 'Bid now' : phase === 'upcoming' ? 'View lots' : 'View results';
+      pv('foot-btn').className = 'btn btn-sm ' + (phase === 'live' ? 'btn-accent' : 'btn-quiet');
+      pv('note').textContent = (status === 'draft' ? 'Draft: bidders cannot see it until it is published. ' : '')
+        + (restricted ? 'Restricted: only its groups and invited bidders see this card. ' : '') + 'Times are IST.';
+
+      var src = uploaded || card.getAttribute('data-cover');
+      var img = pv('img');
+      if (src) { if (img.getAttribute('src') !== src) img.src = src; img.hidden = false; show(pv('ph'), false); } else { img.hidden = true; show(pv('ph'), true); }
+    };
+    var timer = null;
+    var later = function () { clearTimeout(timer); timer = setTimeout(render, 120); };
+    form.addEventListener('input', later);
+    form.addEventListener('change', later);
+    var files = form.elements.images;
+    if (files) files.addEventListener('change', function () {
+      readFirstImage(files, function (url) {
+        // A new photo only becomes the cover when the auction has none yet.
+        uploaded = card.getAttribute('data-cover') ? null : url;
+        render();
+      });
+    });
+    render();
+  }
+
+  // ---------- Lot form: live preview ----------
+  var lotPv = document.querySelector('[data-lot-preview]');
+  if (lotPv) {
+    var lf = document.getElementById('lot-form');
+    var lp = function (k) { return lotPv.querySelector('[data-pv="' + k + '"]'); };
+    var lv = function (id) { var el = lf.elements[id]; return el && el.value !== undefined ? String(el.value).trim() : ''; };
+    var lotUploaded = null;
+    var renderLot = function () {
+      lp('lot_no').textContent = lv('lot_no') || '';
+      lp('title').textContent = lv('title') || 'Material';
+      var unit = lv('unit') || 'unit';
+      lp('unit').textContent = unit;
+      var qRaw = lv('quantity').replace(/[,\s]/g, '');
+      lp('qty').textContent = /^\d+(\.\d{1,3})?$/.test(qRaw) && Number(qRaw) > 0 ? nf3.format(Number(qRaw)) + ' ' + unit : 'Quantity not set';
+      var start = money(lv('start_price'));
+      var inc = money(lv('increment'));
+      lp('start').textContent = start ? inr(start) + ' / ' + unit : 'Not set';
+      lp('increment').textContent = inc ? inr(inc) : 'Not set';
+      var gps = [];
+      lf.querySelectorAll('input[data-gp-name]').forEach(function (i) {
+        var n = money(i.value);
+        if (n) gps.push(i.getAttribute('data-gp-name') + ' ' + inr(n));
+      });
+      var gpEl = lp('gp');
+      gpEl.textContent = gps.length ? 'Group start prices: ' + gps.join('; ') : '';
+      gpEl.hidden = !gps.length;
+      var tbody = lp('specs');
+      tbody.innerHTML = '';
+      var labels = lf.querySelectorAll('input[name=spec_label]');
+      var values = lf.querySelectorAll('input[name=spec_value]');
+      var shown = 0;
+      for (var i = 0; i < labels.length && shown < 8; i++) {
+        var a = labels[i].value.trim();
+        var b = values[i] ? values[i].value.trim() : '';
+        if (!a || !b) continue;
+        var tr = document.createElement('tr');
+        var th = document.createElement('th');
+        th.scope = 'row';
+        th.textContent = a;
+        var td = document.createElement('td');
+        td.textContent = b;
+        tr.appendChild(th);
+        tr.appendChild(td);
+        tbody.appendChild(tr);
+        shown++;
+      }
+      lp('specs-table').hidden = !shown;
+      var src = lotUploaded || lotPv.getAttribute('data-cover');
+      var img = lp('img');
+      if (src) { if (img.getAttribute('src') !== src) img.src = src; img.hidden = false; show(lp('ph'), false); } else { img.hidden = true; show(lp('ph'), true); }
+    };
+    var lt = null;
+    var lotLater = function () { clearTimeout(lt); lt = setTimeout(renderLot, 120); };
+    lf.addEventListener('input', lotLater);
+    lf.addEventListener('change', lotLater);
+    lf.addEventListener('click', function (e) { if (e.target.closest('.ax-spec-remove, [data-spec-chip], [data-spec-add]')) lotLater(); });
+    var lfiles = lf.elements.images;
+    if (lfiles) lfiles.addEventListener('change', function () {
+      readFirstImage(lfiles, function (url) { lotUploaded = lotPv.getAttribute('data-cover') ? null : url; renderLot(); });
+    });
+    renderLot();
+  }
 
   // <select data-show-when="value:#target">: show the target only while that value is chosen.
   document.querySelectorAll('select[data-show-when]').forEach(function (sel) {

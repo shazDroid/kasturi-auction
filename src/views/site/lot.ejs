@@ -5,6 +5,9 @@
   var plural = function (n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); };
   var I = function (n, size) { return include('../partials/icon', { name: n, size: size || 18 }); };
   var here = '/auctions/' + a.id + '/lots/' + l.id;
+  var pq = previewQuery || '';
+  var disabledAttr = preview ? 'disabled' : '';
+  var showControls = open && (canBid || preview) && (live || preview);
   var loginHref = '/login?next=' + encodeURIComponent(here);
   function kb(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
   // Kept in step with resultFor() in public/js/room.js.
@@ -22,13 +25,14 @@
 <div class="wrap" data-server-now="<%= serverNow %>">
   <ol class="crumbs">
     <li><a href="/">Home</a></li><li><a href="/auctions">Auctions</a></li>
-    <li><a href="/auctions/<%= a.id %>"><%= a.title %></a></li><li><span aria-current="page">Lot <%= l.lot_no %></span></li>
+    <li><a href="/auctions/<%= a.id %><%= pq %>"><%= a.title %></a></li><li><span aria-current="page">Lot <%= l.lot_no %></span></li>
   </ol>
 
   <div class="lot-page-head">
     <div class="row">
       <span class="lot-no-chip">Lot <%= l.lot_no %> of <%= lotCount %></span>
       <% if (live && open) { %><span class="tag tag-live">Live</span><% } else if (upcoming) { %><span class="tag tag-upcoming">Upcoming</span><% } else { %><span class="tag">Closed</span><% } %>
+      <% if (a.visibility === 'restricted') { %><span class="tag">Invitation only</span><% } %>
     </div>
     <h1><%= l.title %></h1>
     <div class="row">
@@ -104,7 +108,7 @@
     </div>
 
     <aside class="lot-aside">
-      <div data-room data-auction="<%= a.id %>" data-phase="<%= phase %>" data-starts="<%= state.startsAt %>" data-user="<%= user ? 1 : 0 %>" data-can-bid="<%= canBid ? 1 : 0 %>">
+      <div data-room data-auction="<%= a.id %>" data-phase="<%= phase %>" data-starts="<%= state.startsAt %>" data-user="<%= user ? 1 : 0 %>" data-can-bid="<%= canBid ? 1 : 0 %>"<% if (pq) { %> data-state-url="/auctions/<%= a.id %>/state<%= pq %>"<% } %>>
         <div class="bid-panel <%= panelClass %>" data-lot="<%= l.id %>" data-lot-no="<%= l.lot_no %>" data-unit="<%= l.unit %>" data-status="<%= l.status %>" data-ends="<%= l.endsAt %>" data-increment="<%= l.increment %>">
           <div class="bp-top">
             <div class="js-close"><div>
@@ -125,7 +129,7 @@
             <span class="sub"><%= plural(l.bids, 'bid') %></span>
           </div></div>
           <div class="bp-figs">
-            <div><span>Start price</span><b><%= fmtINR(l.start_price) %></b> <span>per <%= l.unit %></span></div>
+            <div><span>Start price</span><b><%= fmtINR(l.startPrice) %></b> <span>per <%= l.unit %></span></div>
             <div><span>Bid increment</span><b><%= fmtINR(l.increment) %></b></div>
           </div>
           <div class="bp-act">
@@ -138,20 +142,21 @@
             <div class="js-action">
               <% if (!open) { %>
                 <span class="tag <%= r[1] %>"><%= r[0] %></span>
-              <% } else if (upcoming) { %>
+              <% } else if (upcoming && !preview) { %>
                 <p class="muted small" style="margin:0">Bidding opens <%= fmtTime(a.starts_at) %>, <%= fmtDate(a.starts_at) %>. This page updates by itself when it does.</p>
-              <% } else if (canBid) { %>
+              <% } else if (canBid || preview) { %>
                 <form class="bid-form" method="post" action="/lots/<%= l.id %>/bid" data-lot="<%= l.id %>">
                   <input type="hidden" name="_csrf" value="<%= csrf %>">
                   <label class="sr" for="bid-<%= l.id %>">Your bid for lot <%= l.lot_no %>, rupees per <%= l.unit %></label>
-                  <div class="amount"><input type="number" id="bid-<%= l.id %>" name="amount" inputmode="decimal" step="any" min="0" value="<%= l.minBid %>" autocomplete="off"></div>
+                  <div class="amount"><input type="number" id="bid-<%= l.id %>" name="amount" inputmode="decimal" step="any" min="0" value="<%= l.minBid %>" autocomplete="off" <%= disabledAttr %>></div>
                   <div class="quick-steps" role="group" aria-label="Add to the current highest bid">
-                    <% [1, 2, 5].forEach(function (n) { %><button type="button" data-step="<%= n %>" title="Current highest plus <%= n %> increment<%= n > 1 ? 's' : '' %>">+<%= fmtINR(n * l.increment) %></button><% }) %>
+                    <% [1, 2, 5].forEach(function (n) { %><button type="button" data-step="<%= n %>" title="Current highest plus <%= n %> increment<%= n > 1 ? 's' : '' %>" <%= disabledAttr %>>+<%= fmtINR(n * l.increment) %></button><% }) %>
                   </div>
-                  <button class="btn btn-accent" type="submit">Place bid</button>
+                  <button class="btn btn-accent" type="submit" <%= disabledAttr %>>Place bid</button>
                 </form>
                 <div class="bid-confirm hide" role="group" aria-label="Confirm your bid"></div>
-                <div class="bid-msg" aria-live="polite" data-min="<%= l.minBid %>">Minimum <%= fmtINR(l.minBid) %> per <%= l.unit %></div>
+                <div class="bid-msg" aria-live="polite" data-min="<%= l.minBid %>"<% if (preview) { %> data-hold="1"<% } %>>Minimum <%= fmtINR(l.minBid) %> per <%= l.unit %></div>
+                <% if (preview) { %><p class="preview-note">Preview: this is what an eligible bidder sees<%= preview.asGroup ? ' in ' + preview.asGroup.name : '' %>. Bidding is disabled.</p><% } %>
               <% } else if (user) { %>
                 <p class="small" style="margin:0 0 10px">Complete your registration to bid on this lot.</p>
                 <a class="btn btn-block" href="/account">Go to my account</a>
@@ -160,16 +165,40 @@
                 <% if (S.registration_open === '1') { %><p class="small muted" style="margin:10px 0 0">No account yet? <a href="/register">Register your company</a>.</p><% } %>
               <% } %>
             </div>
-            <p class="bp-note">Bids are per <%= l.unit %>, excluding GST. <% if (a.extend_by_min > 0 && a.extend_window_min > 0) { %>A bid in the last <%= plural(a.extend_window_min, 'minute') %> extends this lot by <%= plural(a.extend_by_min, 'minute') %>.<% } %><% if (!a.show_highest_bid) { %> The highest bid is hidden in this auction.<% } %></p>
+            <% if (autoBid && showControls) { %>
+              <div class="autobid js-autobid" id="autobid">
+                <div class="ab-head">
+                  <h3>Auto-bid</h3>
+                  <span class="js-ab-status ab-status<%= l.myMax ? '' : ' hide' %>">Auto-bid on up to <b class="js-abmax"><%= l.myMax ? fmtINR(l.myMax) : '' %></b></span>
+                </div>
+                <p class="ab-help">We bid for you one step at a time, only as much as needed to stay ahead, up to your maximum. Other bidders never see your maximum.</p>
+                <form class="ab-form" method="post" action="/lots/<%= l.id %>/autobid">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <label for="ab-<%= l.id %>">Your maximum, rupees per <%= l.unit %></label>
+                  <div class="ab-row">
+                    <div class="amount"><input type="number" id="ab-<%= l.id %>" name="max" inputmode="decimal" step="any" min="0" value="<%= l.myMax || '' %>" placeholder="At least <%= l.minBid %>" autocomplete="off" <%= disabledAttr %>></div>
+                    <button class="btn js-ab-set" type="submit" <%= disabledAttr %>><%= l.myMax ? 'Update maximum' : 'Set auto-bid' %></button>
+                  </div>
+                </form>
+                <div class="bid-confirm ab-confirm hide" role="group" aria-label="Confirm your maximum"></div>
+                <form class="ab-stop<%= l.myMax ? '' : ' hide' %>" method="post" action="/lots/<%= l.id %>/autobid/cancel">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <button class="btn btn-quiet btn-sm" type="submit" <%= disabledAttr %>>Stop auto-bid</button>
+                </form>
+                <div class="bid-msg ab-msg" aria-live="polite"></div>
+              </div>
+            <% } %>
+            <p class="bp-note">Bids are per <%= l.unit %>, excluding GST.<% if (commission > 0) { %> Buyer's commission <%= Number(commission) %>% is added to the winning amount.<% } %> <% if (a.extend_by_min > 0 && a.extend_window_min > 0) { %>A bid in the last <%= plural(a.extend_window_min, 'minute') %> extends this lot by <%= plural(a.extend_by_min, 'minute') %>.<% } %><% if (!a.show_highest_bid) { %> The highest bid is hidden in this auction.<% } %></p>
           </div>
         </div>
       </div>
         <% if (live || upcoming) { %><div class="conn-line" id="rb-conn"><span class="dot" aria-hidden="true"></span><span id="rb-conn-text">Connecting</span><span class="muted">Server time <b id="rb-clock" class="tnum"><%= fmtTime(new Date(serverNow)) %></b> IST</span></div><% } %>
 
       <div class="panel">
-        <div class="panel-head"><h3><%- I('gavel') %>Auction</h3><a class="small" href="/auctions/<%= a.id %>">All <%= lotCount %> lots</a></div>
+        <div class="panel-head"><h3><%- I('gavel') %>Auction</h3><a class="small" href="/auctions/<%= a.id %><%= pq %>">All <%= lotCount %> lots</a></div>
         <div class="panel-body">
-          <p style="font-weight:600;margin-bottom:12px"><a href="/auctions/<%= a.id %>" style="color:inherit"><%= a.title %></a></p>
+          <p style="font-weight:600;margin-bottom:12px"><a href="/auctions/<%= a.id %><%= pq %>" style="color:inherit"><%= a.title %></a></p>
+          <% if (!preview && phase !== 'closed') { %><div class="lot-watch"><%- include('../partials/watch', { auctionId: a.id, watching: watching }) %></div><% } %>
           <dl class="kv small">
             <dt>Starts</dt><dd><%= fmtDT(a.starts_at) %></dd>
             <dt><%= a.stagger_min > 0 ? 'First lot closes' : 'Ends' %></dt><dd><%= fmtDT(a.ends_at) %></dd>
@@ -186,8 +215,8 @@
 
       <% if (prev || next) { %>
         <nav class="lot-nav" aria-label="Other lots">
-          <% if (prev) { %><a href="/auctions/<%= a.id %>/lots/<%= prev.id %>"><%- I('chevron-left') %><span><small>Previous, lot <%= prev.lot_no %></small><b><%= prev.title %></b></span></a><% } %>
-          <% if (next) { %><a class="next" href="/auctions/<%= a.id %>/lots/<%= next.id %>"><span><small>Next, lot <%= next.lot_no %></small><b><%= next.title %></b></span><%- I('chevron-right') %></a><% } %>
+          <% if (prev) { %><a href="/auctions/<%= a.id %>/lots/<%= prev.id %><%= pq %>"><%- I('chevron-left') %><span><small>Previous, lot <%= prev.lot_no %></small><b><%= prev.title %></b></span></a><% } %>
+          <% if (next) { %><a class="next" href="/auctions/<%= a.id %>/lots/<%= next.id %><%= pq %>"><span><small>Next, lot <%= next.lot_no %></small><b><%= next.title %></b></span><%- I('chevron-right') %></a><% } %>
         </nav>
       <% } %>
     </aside>

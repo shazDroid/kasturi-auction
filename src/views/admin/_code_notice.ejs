@@ -1,0 +1,8 @@
+<%# Whether registration needs a sign-up code. Expects notice: { required, open }. %>
+<% if (!notice.open) { %>
+  <div class="notice notice-warn"><p>New registrations are closed, so nobody can register with a code at the moment. Turn on "Accept new registrations" in <a href="/admin/settings#s-registration_open">Settings</a>.</p></div>
+<% } else if (notice.required) { %>
+  <div class="notice"><p>The setting "Businesses need a sign-up code to register" is on: only businesses with a valid code can register. <a href="/admin/settings#s-require_invite_code">Change it in Settings</a>.</p></div>
+<% } else { %>
+  <div class="notice notice-warn"><p>The setting "Businesses need a sign-up code to register" is off: anyone can register without a code. Codes still put new bidders into their group. <a href="/admin/settings#s-require_invite_code">Change it in Settings</a>.</p></div>
+<% } %>

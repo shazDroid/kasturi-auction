@@ -1,8 +1,7 @@
-// Lot photo gallery: thumbnail strip, and a full-screen lightbox (<dialog>) with previous/next,
-// arrow keys and Escape. Markup comes from views/site/lot.ejs; without JavaScript the first photo shows.
-(function () {
-  var g = document.querySelector('[data-gallery]');
-  if (!g) return;
+// Photo gallery: thumbnail strip, and a full-screen lightbox (<dialog>) with previous/next,
+// arrow keys and Escape. Markup comes from views/site/lot.ejs (lot photos) and auction.ejs (auction
+// photos in the banner); every [data-gallery] on the page is set up. Without JavaScript the first photo shows.
+document.querySelectorAll('[data-gallery]').forEach(function (g) {
   var items = Array.prototype.slice.call(g.querySelectorAll('[data-full]'));
   if (!items.length) return;
   var mainBtn = g.querySelector('.js-gallery-open');
@@ -66,4 +65,4 @@
     if (e.target === dlg || e.target.classList.contains('lb-stage')) dlg.close();
   });
   dlg.addEventListener('close', function () { if (mainBtn) mainBtn.focus(); });
-})();
+});

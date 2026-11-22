@@ -88,7 +88,7 @@
           <tbody>
             <% rows.forEach(function (a) { %>
               <tr>
-                <td class="cell-main"><a class="primary" href="/auctions/<%= a.id %>"><%= a.title %></a><% if (a.category) { %><span class="sub"><%= a.category %></span><% } %></td>
+                <td class="cell-main"><a class="primary" href="/auctions/<%= a.id %>"><%= a.title %></a><% if (a.category || a.visibility === 'restricted') { %><span class="sub"><%= a.category %><% if (a.visibility === 'restricted') { %> <span class="tag">Invitation only</span><% } %></span><% } %></td>
                 <td data-label="Seller"><%= a.seller_name || 'Not disclosed' %></td>
                 <td data-label="Location"><%= a.location %></td>
                 <td class="num" data-label="Lots"><%= a.lot_count %></td>

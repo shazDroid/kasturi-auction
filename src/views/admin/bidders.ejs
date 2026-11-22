@@ -26,24 +26,33 @@
     <option value="no" <%= f.blocked === 'no' ? 'selected' : '' %>>Active accounts</option>
     <option value="yes" <%= f.blocked === 'yes' ? 'selected' : '' %>>Blocked accounts</option>
   </select>
+  <label class="sr" for="f-group">Group</label>
+  <select id="f-group" name="group">
+    <option value="">Any group</option>
+    <option value="none" <%= f.group === 'none' ? 'selected' : '' %>>Not in a group</option>
+    <% groups.forEach(function (g) { %><option value="<%= g.id %>" <%= f.group === String(g.id) ? 'selected' : '' %>><%= g.name %></option><% }) %>
+  </select>
   <button class="btn btn-quiet" type="submit">Filter</button>
-  <% if (f.q || f.kyc || f.fee || f.blocked) { %><a href="/admin/bidders">Clear filters</a><% } %>
+  <% if (f.q || f.kyc || f.fee || f.blocked || f.group) { %><a href="/admin/bidders">Clear filters</a><% } %>
 </form>
 
 <div class="table-wrap">
 <% if (!rows.length) { %>
   <div class="empty">
-    <% if (f.q || f.kyc || f.fee || f.blocked) { %><h3>No bidders match these filters</h3><p>Check the spelling or <a href="/admin/bidders">clear the filters</a>.</p>
+    <% if (f.q || f.kyc || f.fee || f.blocked || f.group) { %><h3>No bidders match these filters</h3><p>Check the spelling or <a href="/admin/bidders">clear the filters</a>.</p>
     <% } else { %><h3>No bidders yet</h3><p>Bidders appear here when they register on the public site. Share the registration page: <a href="/register" target="_blank" rel="noopener">/register</a>.</p><% } %>
   </div>
 <% } else { %>
+  <form method="post" action="/admin/bidders/move-group" id="bulk-group"><%- include('_csrf') %><input type="hidden" name="back" value="<%= urlWith({}) %>"></form>
   <table class="table table-stack">
-    <thead><tr><th>Bidder no</th><th>Bidder</th><th>City</th><th>Email</th><th>Documents</th><th><%= feeOn ? 'Fee valid until' : 'Fee' %></th><th>Registered</th><th>Last sign in</th></tr></thead>
+    <thead><tr><th class="ax-check-cell"><input type="checkbox" data-select-all="user_ids" form="bulk-group" aria-label="Select all bidders on this page" hidden></th><th>Bidder no</th><th>Bidder</th><th>Group</th><th>City</th><th>Email</th><th>Documents</th><th><%= feeOn ? 'Fee valid until' : 'Fee' %></th><th>Registered</th><th>Last sign in</th></tr></thead>
     <tbody>
     <% rows.forEach(function (u) { %>
       <tr>
+        <td class="ax-check-cell"><input type="checkbox" name="user_ids" value="<%= u.id %>" form="bulk-group" aria-label="Select <%= u.name %>"></td>
         <td data-label="Bidder no" class="nowrap"><span class="code"><%= bidderNo(u.id) %></span></td>
         <td class="cell-main"><a class="primary" href="/admin/bidders/<%= u.id %>"><%= u.name %></a><span class="sub"><%= u.company_name || 'No company entered' %></span><% if (u.blocked) { %> <span class="tag tag-bad">Blocked</span><% } %></td>
+        <td data-label="Group"><% if (u.group_name) { %><a href="/admin/groups/<%= u.group_id %>"><%= u.group_name %></a><% } else { %><span class="muted">None</span><% } %></td>
         <td data-label="City"><%= [u.city, u.state].filter(Boolean).join(', ') %></td>
         <td data-label="Email"><%= u.email %><span class="sub"><%= u.email_verified ? 'Verified' : 'Not verified' %></span></td>
         <td data-label="Documents"><%- tag('kyc', u.kyc_status) %><% if (u.kyc_status === 'pending' && u.kyc_submitted_at) { %><span class="sub"><%= fmtDate(u.kyc_submitted_at) %></span><% } %></td>
@@ -56,4 +65,16 @@
   </table>
 <% } %>
 </div>
+<% if (rows.length) { %>
+<div class="ax-bulk">
+  <label for="bulk-group-id">Move selected bidders to group</label>
+  <select id="bulk-group-id" name="group_id" form="bulk-group">
+    <option value="">Choose a group</option>
+    <% groups.forEach(function (g) { %><option value="<%= g.id %>"><%= g.name %></option><% }) %>
+    <option value="none">No group (default fee and commission)</option>
+  </select>
+  <button class="btn btn-quiet btn-sm" type="submit" form="bulk-group">Move selected bidders</button>
+  <% if (!groups.length) { %><span class="muted small"><a href="/admin/groups/new">Create a group</a> first.</span><% } %>
+</div>
+<% } %>
 <%- include('_pager') %>

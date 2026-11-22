@@ -14,7 +14,7 @@
     <% board.forEach(function (a) { var live = a.phase === 'live'; %>
       <a class="board-row<%= live ? ' is-live' : '' %>" href="/auctions/<%= a.id %>">
         <div class="board-date"><b><%= a.dayNum %></b><span><%= a.month %>, <%= a.weekday %></span></div>
-        <div class="board-title"><%= a.title %><% if (a.seller_name) { %><span class="sub"><%= a.seller_name %></span><% } %></div>
+        <div class="board-title"><%= a.title %><% if (a.seller_name || a.visibility === 'restricted') { %><span class="sub"><%= a.seller_name %><% if (a.visibility === 'restricted') { %> <span class="tag">Invitation only</span><% } %></span><% } %></div>
         <div class="board-cell col-loc"><%= a.location || 'Location on request' %><% if (a.category) { %><span class="sub"><%= a.category %></span><% } %></div>
         <div class="board-cell col-lots"><%= a.lot_count %><span class="sr"> lots</span></div>
         <div class="board-cell col-time"><%= a.window %></div>

@@ -1,0 +1,166 @@
+<%
+  var STATUS = { 'new': ['tag tag-ok', 'Will be added'], update: ['tag tag-upcoming', 'Will update'], skip: ['tag', 'Skipped'], error: ['tag tag-bad', 'Error'] };
+  var st = function (s) { var t = STATUS[s] || ['tag', s]; return '<span class="' + t[0] + '">' + t[1] + '</span>'; };
+  var showRow = function (it) { return !only || it.status === 'error' || it.status === 'skip' || it.note; };
+  var errList = function (it) {
+    var out = '';
+    if (it.errors.length) {
+      out += '<ul class="bl-errors">';
+      it.errors.forEach(function (e) { out += '<li><b>' + escapeHtml(e.col) + '</b>: ' + escapeHtml(e.msg) + '</li>'; });
+      out += '</ul>';
+    }
+    if (it.note) out += '<span class="sub">' + escapeHtml(it.note) + '</span>';
+    return out;
+  };
+  var o = p.options;
+  var cellOr = function (val, rawVal, bad) { return val !== undefined && val !== null && val !== '' ? val : (rawVal ? '<span class="bl-cell-bad">' + escapeHtml(rawVal) + '</span>' : ''); };
+%>
+<div class="page-head">
+  <div>
+    <h1><%= title %></h1>
+    <p>File "<%= p.file %>"<% if (kind === 'lots' && v.auction) { %>, into <a href="/admin/auctions/<%= v.auction.id %>"><%= v.auction.title %></a><% } %>. Nothing has been saved yet. Check the rows, then import.</p>
+  </div>
+  <form method="post" action="/admin/excel/import/discard" class="inline-form"><%- include('_csrf') %>
+    <button class="btn btn-quiet" type="submit">Discard and start again</button>
+  </form>
+</div>
+
+<% if (v.fatal.length) { %>
+  <div class="notice notice-error">
+    <p><b>This file cannot be imported:</b></p>
+    <% v.fatal.forEach(function (f) { %><p><%= f %></p><% }) %>
+  </div>
+<% } %>
+<% v.warnings.forEach(function (w) { %><div class="notice"><p><%= w %></p></div><% }) %>
+
+<% if (!v.fatal.length) { %>
+  <% if (kind === 'lots') { %>
+    <ul class="bl-summary">
+      <li><b><%= counts.total %></b> rows read</li>
+      <li><b><%= counts.new %></b> new lots</li>
+      <% if (counts.update) { %><li><b><%= counts.update %></b> lots to update</li><% } %>
+      <li><b><%= counts.skip %></b> skipped as duplicates</li>
+      <li class="<%= counts.error ? 'bad' : '' %>"><b><%= counts.error %></b> rows with errors</li>
+    </ul>
+  <% } else { %>
+    <ul class="bl-summary">
+      <li><b><%= counts.auctionsOk %></b> of <%= counts.auctions %> auctions ready</li>
+      <li><b><%= lotsReady %></b> of <%= counts.lots %> lots ready</li>
+      <li><b><%= counts.auctionErrors %></b> auction rows with errors</li>
+      <li><b><%= counts.lotErrors %></b> lot rows with errors</li>
+      <% if (counts.lotSkips) { %><li><b><%= counts.lotSkips %></b> lots skipped with their auction</li><% } %>
+    </ul>
+  <% } %>
+
+  <form method="post" action="/admin/excel/import/options" class="panel">
+    <div class="panel-body">
+      <%- include('_csrf') %>
+      <input type="hidden" name="id" value="<%= p.id %>">
+      <div class="bl-options">
+        <fieldset>
+          <legend>Rows with errors</legend>
+          <div class="check"><input type="radio" id="o-skip" name="invalid" value="skip" <%= o.invalid === 'skip' ? 'checked' : '' %>><label for="o-skip">Skip them and import the rest</label></div>
+          <div class="check"><input type="radio" id="o-refuse" name="invalid" value="refuse" <%= o.invalid === 'refuse' ? 'checked' : '' %>><label for="o-refuse">Refuse the whole file</label></div>
+        </fieldset>
+        <% if (kind === 'lots') { %>
+        <fieldset>
+          <legend>Lot number already in the auction</legend>
+          <div class="check"><input type="radio" id="o-dskip" name="dup" value="skip" <%= o.dup === 'skip' ? 'checked' : '' %>><label for="o-dskip">Skip the row</label></div>
+          <div class="check"><input type="radio" id="o-dupd" name="dup" value="update" <%= o.dup === 'update' ? 'checked' : '' %>><label for="o-dupd">Update the existing lot (only if it has no bids)</label></div>
+          <div class="check"><input type="radio" id="o-dnew" name="dup" value="new" <%= o.dup === 'new' ? 'checked' : '' %>><label for="o-dnew">Add as a new lot number</label></div>
+        </fieldset>
+        <% } else { %>
+        <fieldset>
+          <legend>Sellers</legend>
+          <div class="check"><input type="checkbox" id="o-sellers" name="create_sellers" value="1" <%= o.createSellers ? 'checked' : '' %>><label for="o-sellers">Create sellers that do not exist yet</label></div>
+        </fieldset>
+        <% } %>
+      </div>
+      <button class="btn btn-quiet btn-sm" type="submit">Update the check</button>
+    </div>
+  </form>
+
+  <div class="bl-commit">
+    <% if (blocked) { %>
+      <p><%= o.invalid === 'refuse' ? 'Some rows have errors and "Refuse the whole file" is chosen. Fix them in Excel and upload again, or choose to skip invalid rows.' : 'There is nothing valid to import. Fix the errors listed below in Excel and upload the file again.' %></p>
+    <% } else { %>
+      <p><% if (kind === 'lots') { %><%= counts.new %> lot<%= counts.new === 1 ? '' : 's' %> will be added<%= counts.update ? ' and ' + counts.update + ' updated' : '' %><%= counts.error ? '. Rows with errors are left out' : '' %>.<% } else { %><%= ready %> draft auction<%= ready === 1 ? '' : 's' %> with <%= lotsReady %> lot<%= lotsReady === 1 ? '' : 's' %> will be created.<% } %></p>
+      <form method="post" action="/admin/excel/import/commit" class="inline-form"><%- include('_csrf') %>
+        <input type="hidden" name="id" value="<%= p.id %>">
+        <button class="btn" type="submit"><% if (kind === 'lots') { %>Import <%= ready %> valid lot<%= ready === 1 ? '' : 's' %><% } else { %>Create <%= ready %> auction<%= ready === 1 ? '' : 's' %><% } %></button>
+      </form>
+    <% } %>
+  </div>
+
+  <nav class="tabs" aria-label="Rows">
+    <a href="/admin/excel/import/review" <%- !only ? 'aria-current="page"' : '' %>>All rows</a>
+    <a href="/admin/excel/import/review?only=problems" <%- only ? 'aria-current="page"' : '' %>>Rows with problems or notes</a>
+  </nav>
+
+  <% if (kind === 'lots') { %>
+    <div class="table-wrap">
+      <table class="table bl-preview">
+        <thead><tr><th>Row</th><th>Status</th><th class="num">Lot no</th><th>Title</th><th class="num">Quantity</th><th class="num">Start price</th><th class="num">Increment</th><th class="num">Reserve</th><th>Specifications and group prices</th><th>Problems and notes</th></tr></thead>
+        <tbody>
+        <% var shown = 0; v.items.forEach(function (it) { if (!showRow(it)) return; shown++; var d = it.data, raw = it.raw; %>
+          <tr class="<%= it.status === 'error' ? 'is-bad' : '' %>">
+            <td><%= it.row %></td>
+            <td><%- st(it.status) %></td>
+            <td class="num"><%- cellOr(d.lot_no, raw.lot_no) %></td>
+            <td class="bl-wrap"><%- cellOr(escapeHtml(d.title), raw.title) %></td>
+            <td class="num nowrap"><%- d.quantity !== undefined ? fmtNum(d.quantity) + ' ' + escapeHtml(d.unit || raw.unit) : cellOr('', raw.quantity + (raw.unit ? ' ' + raw.unit : '')) %></td>
+            <td class="num nowrap"><%- d.start_price !== undefined ? fmtINR(d.start_price) : cellOr('', raw.start_price) %></td>
+            <td class="num nowrap"><%- d.increment !== undefined ? fmtINR(d.increment) : cellOr('', raw.increment) %></td>
+            <td class="num nowrap"><%- d.reserve_price !== null && d.reserve_price !== undefined ? fmtINR(d.reserve_price) : (raw.reserve_price && d.reserve_price === undefined ? cellOr('', raw.reserve_price) : '<span class="muted">None</span>') %></td>
+            <td class="small bl-wrap"><%= d.specs.map(function (x) { return x.label + ': ' + x.value; }).join('; ') %><% if (d.groupPrices.length) { %><span class="sub"><%= d.groupPrices.map(function (g) { return g.name + ' ' + fmtINR(g.start_price); }).join('; ') %></span><% } %></td>
+            <td><%- errList(it) %></td>
+          </tr>
+        <% }) %>
+        <% if (!shown) { %><tr><td colspan="10" class="muted">No rows with problems.</td></tr><% } %>
+        </tbody>
+      </table>
+    </div>
+  <% } else { %>
+    <section class="admin-section">
+      <h2>Auctions sheet</h2>
+      <div class="table-wrap">
+        <table class="table bl-preview">
+          <thead><tr><th>Row</th><th>Status</th><th>Ref</th><th>Title</th><th>Seller</th><th>Starts (IST)</th><th>Closes (IST)</th><th>Visibility</th><th class="num">Lots</th><th>Problems and notes</th></tr></thead>
+          <tbody>
+          <% v.auctions.forEach(function (it) { if (!showRow(it)) return; var d = it.data; %>
+            <tr class="<%= it.status === 'error' ? 'is-bad' : '' %>">
+              <td><%= it.row %></td><td><%- st(it.status) %></td><td><%= d.ref %></td><td class="bl-wrap"><%= d.title %></td>
+              <td><%= d.sellerName %></td><td class="nowrap"><%= d.starts_at ? fmtDT(d.starts_at) : '' %></td><td class="nowrap"><%= d.ends_at ? fmtDT(d.ends_at) : '' %></td>
+              <td><%= d.visibility === 'restricted' ? 'Restricted' : 'Public' %></td>
+              <td class="num"><%= it.lots.filter(function (l) { return l.status === 'new'; }).length %></td>
+              <td><%- errList(it) %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+    <section class="admin-section">
+      <h2>Lots sheet</h2>
+      <div class="table-wrap">
+        <table class="table bl-preview">
+          <thead><tr><th>Row</th><th>Status</th><th>Auction ref</th><th class="num">Lot no</th><th>Title</th><th class="num">Quantity</th><th class="num">Start price</th><th>Specifications</th><th>Problems and notes</th></tr></thead>
+          <tbody>
+          <% var shownL = 0; v.lots.forEach(function (it) { if (!showRow(it)) return; shownL++; var d = it.data, raw = it.raw; %>
+            <tr class="<%= it.status === 'error' ? 'is-bad' : '' %>">
+              <td><%= it.row %></td><td><%- st(it.status) %></td><td><%= it.ref %></td>
+              <td class="num"><%- cellOr(d.lot_no, raw.lot_no) %></td>
+              <td class="bl-wrap"><%- cellOr(escapeHtml(d.title), raw.title) %></td>
+              <td class="num nowrap"><%- d.quantity !== undefined ? fmtNum(d.quantity) + ' ' + escapeHtml(d.unit || raw.unit) : cellOr('', raw.quantity + (raw.unit ? ' ' + raw.unit : '')) %></td>
+              <td class="num nowrap"><%- d.start_price !== undefined ? fmtINR(d.start_price) : cellOr('', raw.start_price) %></td>
+              <td class="small bl-wrap"><%= d.specs.map(function (x) { return x.label + ': ' + x.value; }).join('; ') %></td>
+              <td><%- errList(it) %></td>
+            </tr>
+          <% }) %>
+          <% if (!shownL) { %><tr><td colspan="9" class="muted">No rows to show.</td></tr><% } %>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  <% } %>
+<% } %>

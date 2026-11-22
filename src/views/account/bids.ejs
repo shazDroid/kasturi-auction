@@ -16,7 +16,7 @@
               <td class="cell-main"><% if (l.auction_status === 'published') { %><a class="primary" href="/auctions/<%= l.auction_id %>/lots/<%= l.id %>">Lot <%= l.lot_no %>: <%= l.title %></a><% } else { %><span class="primary">Lot <%= l.lot_no %>: <%= l.title %></span><% } %></td>
               <td data-label="Auction"><a href="/auctions/<%= l.auction_id %>"><%= l.auction_title %></a></td>
               <td class="num" data-label="Your highest bid"><%= fmtINR(l.my_amount) %><span class="sub">per <%= l.unit %></span></td>
-              <td data-label="Standing"><span class="tag <%= l.tone %>"><%= l.standing %></span></td>
+              <td data-label="Standing"><span class="tag <%= l.tone %>"><%= l.standing %></span><% if (l.sale_order_id && l.won && l.result === 'awarded') { %><span class="sub"><a href="/account/billing/sale-orders/<%= l.sale_order_id %>.pdf" target="_blank" rel="noopener">Sale order <%= l.sale_order_no %></a></span><% } %></td>
               <td data-label="Closes" class="nowrap">
                 <% if (open) { %><span class="countdown" data-countdown="<%= new Date(l.ends_at).getTime() %>" data-done="Closing"></span><span class="sub muted small"><%= fmtDT(l.ends_at) %></span>
                 <% } else { %><%= fmtDT(l.ends_at) %><% } %>

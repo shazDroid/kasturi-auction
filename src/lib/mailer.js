@@ -491,6 +491,74 @@ const DEFAULT_TEMPLATES = [
 </table>
 <p>{{message}}</p>`,
   },
+  {
+    key: 'watch_alert',
+    name: 'Watched auction starting',
+    description: 'Sent to bidders who added an auction to their watchlist, shortly before bidding starts (lead time set in Settings).',
+    variables: 'name, auction_title, location, starts_at, ends_at, minutes, auction_url',
+    subject: 'Bidding opens in {{minutes}} minutes: {{auction_title}}',
+    body: `<p>Dear {{name}},</p>
+<p>An auction on your watchlist opens for bidding in about {{minutes}} minutes.</p>
+<table class="details">
+<tr><td>Auction</td><td>{{auction_title}}</td></tr>
+<tr><td>Material location</td><td>{{location}}</td></tr>
+<tr><td>Bidding starts</td><td>{{starts_at}}</td></tr>
+<tr><td>Bidding ends</td><td>{{ends_at}}</td></tr>
+</table>
+<p>Sign in now and check that your account is ready to bid. Lots may close later than shown if bids come in during the last few minutes.</p>
+<p><a class="btn" href="{{auction_url}}">Open auction</a></p>`,
+  },
+  {
+    key: 'invite_code',
+    name: 'Sign-up code invitation',
+    description: 'Sent when an admin emails a sign-up code to a business from the Sign-up codes page.',
+    variables: 'name, company, code, register_url, expires_on, group_name',
+    subject: 'Your invitation to register with {{site_name}}',
+    body: `<p>Dear {{name}},</p>
+<p>We invite {{company}} to register as a bidder with {{site_name}}, where industrial scrap and surplus material is sold by open online bidding.</p>
+<table class="details">
+<tr><td>Sign-up code</td><td><strong>{{code}}</strong></td></tr>
+<tr><td>Valid until</td><td>{{expires_on}}</td></tr>
+</table>
+<p>Use the button below to open the registration form with the code already filled in, or enter the code on the form yourself.</p>
+<p><a class="btn" href="{{register_url}}">Register now</a></p>
+<p>After registering, verify your email address and submit your business documents. You can bid once our team has approved them.</p>
+<p>For help, write to {{contact_email}}.</p>`,
+  },
+  {
+    key: 'sale_order_issued',
+    name: 'Sale order issued',
+    description: 'Sent to the winning bidder when a sale order is issued for an awarded lot.',
+    variables: 'name, number, auction_title, lot_no, lot_title, amount, billing_url',
+    subject: 'Sale order {{number}} for lot {{lot_no}}: {{lot_title}}',
+    body: `<p>Dear {{name}},</p>
+<p>We have issued a sale order for the lot awarded to you.</p>
+<table class="details">
+<tr><td>Sale order</td><td>{{number}}</td></tr>
+<tr><td>Auction</td><td>{{auction_title}}</td></tr>
+<tr><td>Lot</td><td>{{lot_no}}, {{lot_title}}</td></tr>
+<tr><td>Amount</td><td>{{amount}}</td></tr>
+</table>
+<p>Download the sale order from your account. It sets out the payment and lifting terms for this lot. Please arrange payment by the date it gives.</p>
+<p><a class="btn" href="{{billing_url}}">View sale order</a></p>`,
+  },
+  {
+    key: 'invoice_issued',
+    name: 'Invoice issued',
+    description: 'Sent to the bidder when a tax invoice is raised for them, for example for the buyer\'s commission on an awarded lot.',
+    variables: 'name, number, description, total, due_on, billing_url',
+    subject: 'Invoice {{number}} from {{site_name}}',
+    body: `<p>Dear {{name}},</p>
+<p>We have raised a tax invoice on your account.</p>
+<table class="details">
+<tr><td>Invoice</td><td>{{number}}</td></tr>
+<tr><td>For</td><td>{{description}}</td></tr>
+<tr><td>Total</td><td>{{total}}</td></tr>
+<tr><td>Due by</td><td>{{due_on}}</td></tr>
+</table>
+<p>Download the invoice from your account. The payment details are printed on it.</p>
+<p><a class="btn" href="{{billing_url}}">View invoice</a></p>`,
+  },
 ];
 
 module.exports = {

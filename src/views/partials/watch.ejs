@@ -1,0 +1,7 @@
+<%# Watch toggle for one auction. Expects auctionId, watching; optional compact (short label, for cards) and dark (on the navy banner).
+    A plain form post without JavaScript; public/js/site.js switches it in place with fetch. %><%
+var wOff = locals.compact ? 'Watch' : 'Watch this auction';
+%><form class="watch-form" method="post" action="/auctions/<%= auctionId %>/<%= watching ? 'unwatch' : 'watch' %>" data-watch="<%= auctionId %>" data-alert-min="<%= Number(S.watch_alert_minutes) || 0 %>">
+  <input type="hidden" name="_csrf" value="<%= csrf %>">
+  <button type="submit" class="btn btn-sm <%= locals.dark ? 'btn-ghost-dark' : 'btn-quiet' %> watch-btn" aria-pressed="<%= watching ? 'true' : 'false' %>" data-on="Watching" data-off="<%= wOff %>"><span class="w-off"><%- include('icon', { name: 'eye', size: 15 }) %></span><span class="w-on"><%- include('icon', { name: 'check', size: 15 }) %></span><span class="w-label"><%= watching ? 'Watching' : wOff %></span><% if (locals.compact) { %><span class="sr"> this auction</span><% } %></button>
+</form>

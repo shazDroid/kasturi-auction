@@ -1085,3 +1085,66 @@ textarea.code-area-tall { min-height: 460px; }
 }
 @media (max-width: 900px) { .site-header .wrap { padding-top: 9px; padding-bottom: 9px; } }
 .room-side .kv dt { font-size: 13px; }
+
+/* ---- version 3 site and bidder portal (restricted auctions, preview, gallery, auto-bid, watchlist, billing) ---- */
+.preview-bar { background: var(--amber-soft); color: var(--amber-ink); border-bottom: 1px solid #f1d48a; margin: -32px 0 32px; padding: 10px 0; font-size: 14.5px; }
+.preview-bar .wrap { display: flex; gap: 8px 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.preview-bar p { margin: 0; }
+.preview-bar a { color: var(--amber-ink); font-weight: 600; margin-left: 4px; }
+.preview-bar .pv-group { display: flex; gap: 8px; align-items: center; }
+.preview-bar .pv-group label { margin: 0; font-size: 13.5px; white-space: nowrap; }
+.preview-bar .pv-group select { width: auto; padding: 6px 34px 6px 10px; font-size: 14px; }
+.preview-note { font-size: 12.5px; color: var(--amber-ink); background: var(--amber-soft); border: 1px solid #f1d48a; border-radius: var(--radius-sm); padding: 8px 10px; margin: 8px 0 0; }
+
+.watch-btn > span { display: inline-flex; align-items: center; }
+.watch-btn[aria-pressed=true] .w-off, .watch-btn[aria-pressed=false] .w-on { display: none; }
+.btn-quiet.watch-btn[aria-pressed=true] { color: var(--go); }
+.btn-ghost-dark.watch-btn[aria-pressed=true] { background: var(--ink-2); border-color: #6c819a; }
+.a-card .foot-act { display: flex; gap: 8px; align-items: center; position: relative; z-index: 2; }
+.a-actions { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+.lot-watch { margin: -4px 0 12px; }
+
+/* Auction photos in the banner: the cover opens the lightbox, thumbnails switch it */
+.a-media { min-width: 0; }
+button.a-cover { display: block; width: 100%; padding: 0; position: relative; cursor: zoom-in; color: inherit; font: inherit; }
+.a-cover .zoom { position: absolute; right: 12px; bottom: 12px; background: rgba(10, 23, 38, .8); color: #fff; font: 600 12.5px var(--body); padding: 7px 10px; border-radius: 5px; display: inline-flex; gap: 6px; align-items: center; }
+.a-media .gallery-thumbs { grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 6px; margin-top: 8px; }
+.a-media .gallery-thumbs button { background: var(--ink-2); opacity: .7; }
+.a-media .gallery-thumbs button[aria-current=true] { border-color: #fff; opacity: 1; }
+@media (max-width: 900px) {
+  .a-media { order: -1; }
+  .a-media .gallery-thumbs { display: flex; overflow-x: auto; scrollbar-width: none; }
+  .a-media .gallery-thumbs button { flex: 0 0 64px; }
+}
+
+/* Auto-bid */
+.ab-note { color: var(--steel); margin: 0 0 8px; }
+.ab-note b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.autobid { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line-soft); }
+.autobid .ab-head { display: flex; justify-content: space-between; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; margin-bottom: 6px; }
+.autobid h3 { font-size: 16px; }
+.autobid .ab-status { font-size: 13px; color: var(--go); font-weight: 600; }
+.autobid .ab-help { font-size: 13px; color: var(--steel); margin: 0 0 12px; }
+.autobid label { font-size: 13px; }
+.autobid .ab-row { display: flex; gap: 8px; }
+.autobid .ab-row .amount { flex: 1; position: relative; min-width: 0; }
+.autobid .ab-row .amount::before { content: '₹'; position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--steel); font-weight: 600; }
+.autobid .ab-row input { padding-left: 28px; height: 44px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.autobid .ab-row .btn { height: 44px; }
+.autobid .ab-stop { margin-top: 10px; }
+
+/* Sign-up code on the register page */
+.code-field input { text-transform: uppercase; letter-spacing: .04em; font-variant-numeric: tabular-nums; }
+.code-opt { margin: 0 0 16px; }
+.code-opt > summary { cursor: pointer; color: var(--link); font-weight: 500; font-size: 14.5px; margin-bottom: 10px; width: max-content; }
+.code-opt > summary:hover { color: var(--ink); }
+.code-opt:not([open]) > summary { margin-bottom: 0; }
+
+@media (max-width: 720px) {
+  .preview-bar { margin: -24px 0 24px; }
+  .preview-bar .pv-group { width: 100%; }
+  .preview-bar .pv-group select { flex: 1; }
+  .autobid .ab-row { flex-wrap: wrap; }
+  .autobid .ab-row .btn { flex: 1 1 100%; }
+}
+.autobid .ab-status.out { color: var(--stop); }

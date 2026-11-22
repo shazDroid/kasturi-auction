@@ -54,6 +54,31 @@
           </div>
         <% } %>
       </section>
+
+      <section class="section">
+        <div class="row-between section-head"><h2>Watched auctions</h2><a href="/account/watchlist">Watchlist</a></div>
+        <% if (!watched.length) { %>
+          <div class="table-wrap"><div class="empty"><h3>You are not watching any upcoming auctions</h3><p>Open an auction from the <a href="/auctions">auction schedule</a> and choose Watch this auction to keep it here.</p></div></div>
+        <% } else { %>
+          <div class="table-wrap">
+            <table class="table table-stack">
+              <thead><tr><th>Auction</th><th>Starts</th><th>Status</th></tr></thead>
+              <tbody>
+                <% watched.forEach(function (w) { var live = w.phase === 'live'; %>
+                  <tr>
+                    <td class="cell-main"><a class="primary" href="/auctions/<%= w.id %>"><%= w.title %></a><span class="sub"><%= w.location || w.seller_name || '' %></span></td>
+                    <td data-label="Starts" class="nowrap"><%= fmtDT(w.starts_at) %></td>
+                    <td data-label="Status" class="nowrap">
+                      <% if (live) { %><span class="tag tag-live">Live</span> <span class="countdown" data-countdown="<%= new Date(w.last_close || w.ends_at).getTime() %>" data-done="Closing"></span>
+                      <% } else { %><span class="tag tag-upcoming">Starts in</span> <span class="countdown" data-countdown="<%= new Date(w.starts_at).getTime() %>" data-done="Starting"></span><% } %>
+                    </td>
+                  </tr>
+                <% }) %>
+              </tbody>
+            </table>
+          </div>
+        <% } %>
+      </section>
     </div>
 
     <div>
@@ -62,6 +87,7 @@
         <div class="panel-body">
           <dl class="kv">
             <dt>Bidder no.</dt><dd><%= bidderNo %></dd>
+            <% if (groupName) { %><dt>Group</dt><dd><%= groupName %></dd><% } %>
             <dt>Name</dt><dd><%= user.name %></dd>
             <dt>Email</dt><dd><%= user.email %><% if (!user.email_verified) { %> <span class="tag tag-warn">Not verified</span><% } %></dd>
             <dt>Phone</dt><dd><%= user.phone || 'Not added' %></dd>

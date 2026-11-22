@@ -7,7 +7,8 @@
 
 <% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. The lot was not saved. If you chose photos, choose them again.</div><% } %>
 
-<form method="post" enctype="multipart/form-data" novalidate
+<div class="ax-with-preview">
+<form method="post" enctype="multipart/form-data" novalidate class="ax-main-form" id="lot-form"
       action="<%= lot ? '/admin/lots/' + lot.id : '/admin/auctions/' + auction.id + '/lots' %>?_csrf=<%= csrf %>">
   <div class="panel">
     <div class="panel-head"><h3>Lot details</h3></div>
@@ -143,12 +144,65 @@
     </div>
   </div>
 
+  <div class="panel" id="group-prices">
+    <div class="panel-head"><h3>Start price by bidder group</h3><span class="muted small">Optional. Leave a box empty and that group opens at the lot's opening price.</span></div>
+    <div class="panel-body">
+      <% if (!groups.length) { %>
+        <p class="muted small">There are no bidder groups. <a href="/admin/groups/new">Create a group</a> to open this lot at a different price for some bidders.</p>
+      <% } else { %>
+        <% if (pricesLocked) { %><div class="notice notice-warn"><p>This lot has bids, so the group start prices are fixed.</p></div><% } %>
+        <% if (errors.group_prices) { %><div class="notice notice-error" role="alert"><p><%= errors.group_prices %></p></div><% } %>
+        <div class="table-wrap ax-gp-wrap">
+          <table class="table ax-gp-table">
+            <thead><tr><th>Group</th><th>Start price (₹)</th></tr></thead>
+            <tbody>
+            <% groups.forEach(function (g) { var val = gp[g.id] || ''; var err = errors['gp_' + g.id]; %>
+              <tr>
+                <th scope="row"><label for="gp-<%= g.id %>"><%= g.name %></label><% if (auction.visibility === 'restricted' && auctionGroups.indexOf(g.id) < 0) { %><span class="sub">Cannot see this restricted auction</span><% } %></th>
+                <td><input type="text" id="gp-<%= g.id %>" name="gp_<%= g.id %>" value="<%= val %>" inputmode="decimal" class="input-sm ax-gp-input" placeholder="Opening price" data-gp-name="<%= g.name %>" <%= pricesLocked ? 'readonly' : '' %><%- err ? ' aria-invalid="true" aria-describedby="gp-err-' + g.id + '"' : '' %>>
+                  <% if (err) { %><div class="err" id="gp-err-<%= g.id %>"><%= err %></div><% } %></td>
+              </tr>
+            <% }) %>
+            </tbody>
+          </table>
+        </div>
+        <p class="hint muted small">Bidders in the group see this as the opening price and their first bid must reach it. Bids from all groups compete on the same lot.</p>
+      <% } %>
+    </div>
+  </div>
+
   <div class="form-actions mt">
     <button class="btn" type="submit">Save lot</button>
+    <button class="btn btn-quiet" type="submit" name="preview" value="1">Save and preview</button>
     <% if (!lot) { %><button class="btn btn-quiet" type="submit" name="and_next" value="1">Save and add another</button><% } %>
     <a class="btn btn-quiet" href="/admin/auctions/<%= auction.id %>">Cancel</a>
   </div>
 </form>
+
+<aside class="ax-live-preview" aria-label="Preview of the lot" data-lot-preview data-cover="<%= photos.length ? '/media/' + photos[0].file_id + '?size=thumb' : '' %>">
+  <div class="ax-live-preview-head"><h2>Preview</h2><span class="muted small">The lot as bidders see it in the list</span></div>
+  <div class="ax-lot-pv" aria-hidden="true">
+    <div class="ax-lot-pv-top">
+      <div class="ax-lot-pv-img">
+        <img data-pv="img" alt="" width="160" height="120" <%- photos.length ? 'src="/media/' + photos[0].file_id + '?size=thumb"' : 'hidden' %>>
+        <div data-pv="ph" <%= photos.length ? 'hidden' : '' %>><%- include('../partials/ph', { category: auction.category, small: true }) %></div>
+      </div>
+      <div class="ax-lot-pv-main">
+        <div class="muted small">Lot <span data-pv="lot_no"><%= v.lot_no %></span></div>
+        <h3 data-pv="title"><%= v.title || 'Material' %></h3>
+        <div class="ax-lot-pv-qty" data-pv="qty"></div>
+      </div>
+    </div>
+    <dl class="ax-lot-pv-prices">
+      <div><dt>Opening price</dt><dd data-pv="start"></dd></div>
+      <div><dt>Minimum raise</dt><dd data-pv="increment"></dd></div>
+    </dl>
+    <div data-pv="gp" class="ax-lot-pv-gp small" hidden></div>
+    <table class="table ax-spec-table ax-lot-pv-specs" data-pv="specs-table" hidden><tbody data-pv="specs"></tbody></table>
+  </div>
+  <p class="hint muted small">Updates as you type. Prices are per <span data-pv="unit"><%= v.unit || 'unit' %></span>.</p>
+</aside>
+</div>
 
 <% if (lot) { photos.forEach(function (p) { %><form id="ph-<%= p.id %>" method="post" action="/admin/lots/<%= lot.id %>/photos/<%= p.id %>" class="hide"><%- include('_csrf') %></form>
 <% }) } %>

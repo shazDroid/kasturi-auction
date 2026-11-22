@@ -15,6 +15,12 @@
   <a class="stat" href="/admin/payments?status=paid"><b><%= fmtINR(stats.fee_month) || '₹0' %></b><span>Fees collected this month</span></a>
 </div>
 
+<div class="ax-access" aria-label="Bidder access">
+  <a href="/admin/groups"><b><%= fmtNum(stats.groups) %></b> bidder group<%= stats.groups === 1 ? '' : 's' %><span class="muted">, <%= fmtNum(stats.grouped_bidders) %> bidder<%= stats.grouped_bidders === 1 ? '' : 's' %> in them</span></a>
+  <a href="/admin/codes?status=active"><b><%= fmtNum(stats.active_codes) %></b> active sign-up code<%= stats.active_codes === 1 ? '' : 's' %><span class="muted"><%= S.require_invite_code === '1' ? ', required to register' : ', not required to register' %></span></a>
+  <a href="/admin/auctions?vis=restricted"><b><%= fmtNum(stats.restricted_open) %></b> restricted auction<%= stats.restricted_open === 1 ? '' : 's' %><span class="muted"> live or upcoming</span></a>
+</div>
+
 <% if (attention.length) { %>
 <section class="admin-section">
   <h2>Needs attention</h2>

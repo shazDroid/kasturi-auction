@@ -6,8 +6,10 @@ const settings = require('../lib/settings');
 const mailer = require('../lib/mailer');
 const razorpay = require('../lib/razorpay');
 const payments = require('../lib/payments');
-const { clean, bidderNo } = require('../lib/util');
+const { PHASE_SQL } = require('../lib/bidding');
+const { clean, bidderNo, toInt } = require('../lib/util');
 const mw = require('../middleware');
+const { listedSql, canSeeSql } = require('./visible');
 
 const { wrap, requireUser } = mw;
 const router = express.Router();
@@ -40,13 +42,41 @@ function missingProfile(u) {
   return miss;
 }
 
-/** Fee state shared by the overview and fee pages. */
-function feeInfo(user) {
+/** Fee state shared by the overview and fee pages. The quote is this bidder's own (group fee if their group has one). */
+async function feeInfo(user) {
   const enabled = settings.bool('fee_enabled');
   const active = payments.feeActive(user);
   const until = payments.validUntilText(user.fee_paid_until);
   const expiresSoon = active && until !== 'No expiry' && new Date(user.fee_paid_until) - Date.now() < 30 * DAY;
-  return { enabled, active, until, expiresSoon, quote: payments.feeQuote() };
+  const quote = await payments.feeQuoteFor(user.id);
+  const g = user.group_id ? await db.one('SELECT fee_amount FROM bidder_groups WHERE id = $1', [user.group_id]) : null;
+  const groupFee = !!(g && g.fee_amount !== null && quote.groupName);
+  return { enabled, active, until, expiresSoon, quote, groupFee };
+}
+
+/** Watched auctions this bidder may still see, live first, then upcoming by start, then closed. */
+const watchedAuctions = (userId, { openOnly = false, limit = 200 } = {}) => db.many(
+  `SELECT * FROM (
+     SELECT a.id, a.title, a.location, a.category, a.starts_at, a.ends_at, a.visibility, s.name AS seller_name,
+            ${PHASE_SQL} AS phase, w.created_at AS watched_at,
+            (SELECT count(*)::int FROM lots WHERE auction_id = a.id) AS lot_count,
+            (SELECT max(ends_at) FROM lots WHERE auction_id = a.id AND status = 'open') AS last_close,
+            (SELECT max(ends_at) FROM lots WHERE auction_id = a.id) AS closed_at
+       FROM watchlist w JOIN auctions a ON a.id = w.auction_id LEFT JOIN sellers s ON s.id = a.seller_id
+      WHERE w.user_id = $1 AND ${listedSql(1)}) x
+    ${openOnly ? `WHERE phase IN ('live', 'upcoming')` : ''}
+    ORDER BY (phase = 'closed'), (phase = 'live') DESC, CASE WHEN phase = 'closed' THEN NULL ELSE starts_at END, closed_at DESC
+    LIMIT $2`, [userId, limit]
+);
+
+/** The billing module is written separately; until it exists (or if it fails to load) pages show an empty state. */
+function billingLib() {
+  try {
+    return require('../lib/billing');
+  } catch (e) {
+    if (!(e.code === 'MODULE_NOT_FOUND' && String(e.message).includes('lib/billing'))) console.error('billing module', e.message);
+    return null;
+  }
 }
 
 /* ---------------- Overview ---------------- */
@@ -61,14 +91,17 @@ router.get('/account', wrap(async (req, res) => {
        JOIN auctions a ON a.id = l.auction_id
        LEFT JOIN LATERAL (SELECT amount, user_id FROM bids b WHERE b.lot_id = l.id AND NOT b.cancelled
                            ORDER BY amount DESC, id ASC LIMIT 1) t ON true
-      WHERE a.status = 'published' AND l.status = 'open' AND now() >= a.starts_at
+      WHERE ${listedSql(1)} AND l.status = 'open' AND now() >= a.starts_at
         AND EXISTS (SELECT 1 FROM bids b WHERE b.lot_id = l.id AND b.user_id = $1 AND NOT b.cancelled)
       ORDER BY l.ends_at, l.lot_no LIMIT 25`, [u.id]
   );
   // Never pass another bidder's identity to the view; hide the top amount where the auction hides it.
   const activeLots = rows.map((r) => ({ ...r, top_amount: r.show_highest_bid || r.leading ? r.top_amount : null }));
+  const group = u.group_id ? await db.one('SELECT name FROM bidder_groups WHERE id = $1', [u.group_id]) : null;
   res.page('account/overview', {
-    title: 'My account', tab: 'overview', bidderNo: bidderNo(u.id), fee: feeInfo(u), activeLots,
+    title: 'My account', tab: 'overview', bidderNo: bidderNo(u.id), fee: await feeInfo(u), activeLots,
+    groupName: group ? group.name : '',
+    watched: await watchedAuctions(u.id, { openOnly: true, limit: 5 }),
     kycRequired: settings.bool('require_kyc_approval'), serverNow: Date.now(),
   });
 }));
@@ -222,18 +255,18 @@ router.get('/account/documents/:id', wrap(async (req, res) => {
 
 /* ---------------- Registration fee ---------------- */
 
-router.get('/account/fee', (req, res) => {
-  const fee = feeInfo(req.user);
+router.get('/account/fee', wrap(async (req, res) => {
+  const fee = await feeInfo(req.user);
   const canPay = fee.enabled && fee.quote.total > 0 && (!fee.active || fee.expiresSoon);
   const online = razorpay.configured();
   res.page('account/fee', {
     title: 'Registration fee', tab: 'fee', fee, canPay, online,
     scripts: canPay && online ? ['https://checkout.razorpay.com/v1/checkout.js', '/js/pay.js'] : [],
   });
-});
+}));
 
 router.post('/account/fee/order', wrap(async (req, res) => {
-  const fee = feeInfo(req.user);
+  const fee = await feeInfo(req.user);
   if (!fee.enabled || fee.quote.total <= 0) return res.status(400).json({ error: 'No registration fee is required at the moment.' });
   if (fee.active && !fee.expiresSoon) return res.status(400).json({ error: `Your fee is already paid until ${fee.until}.` });
   if (!razorpay.configured()) return res.status(400).json({ error: 'Online payment is not available yet. Contact support for bank transfer details.' });
@@ -278,13 +311,15 @@ router.get('/account/bids', wrap(async (req, res) => {
   const rows = await db.many(
     `SELECT l.id, l.lot_no, l.title, l.status, l.result, l.ends_at, l.unit,
             a.id AS auction_id, a.title AS auction_title, a.status AS auction_status, a.starts_at,
-            mb.my_amount, (t.user_id = $1) AS leading, (wb.user_id = $1) AS won
+            mb.my_amount, (t.user_id = $1) AS leading, (wb.user_id = $1) AS won, so.id AS sale_order_id, so.number AS sale_order_no
        FROM (SELECT lot_id, max(amount) AS my_amount FROM bids WHERE user_id = $1 AND NOT cancelled GROUP BY lot_id) mb
        JOIN lots l ON l.id = mb.lot_id
        JOIN auctions a ON a.id = l.auction_id
        LEFT JOIN LATERAL (SELECT user_id FROM bids b WHERE b.lot_id = l.id AND NOT b.cancelled
                            ORDER BY amount DESC, id ASC LIMIT 1) t ON true
        LEFT JOIN bids wb ON wb.id = l.winning_bid_id
+       LEFT JOIN sale_orders so ON so.lot_id = l.id AND so.user_id = $1
+      WHERE a.status IN ('published', 'cancelled') AND ${canSeeSql(1)}
       ORDER BY (l.status = 'open' AND a.status = 'published') DESC, l.ends_at DESC
       LIMIT 500`, [uid]
   );
@@ -300,6 +335,110 @@ router.get('/account/bids', wrap(async (req, res) => {
   });
   res.page('account/bids', { title: 'My bids', tab: 'bids', lots });
 }));
+
+/* ---------------- Watchlist ---------------- */
+
+router.get('/account/watchlist', wrap(async (req, res) => {
+  res.page('account/watchlist', {
+    title: 'Watchlist', tab: 'watchlist', rows: await watchedAuctions(req.user.id),
+    alertMinutes: settings.num('watch_alert_minutes'), serverNow: Date.now(),
+  });
+}));
+
+/* ---------------- Sale orders and invoices ---------------- */
+
+const num = (v) => (v === null || v === undefined || v === '' || !Number.isFinite(Number(v)) ? null : Number(v));
+/** First field present in the row or its frozen snapshot, so the page copes with small naming differences. */
+function pick(r, keys) {
+  const snap = r && r.snapshot && typeof r.snapshot === 'object' ? r.snapshot : {};
+  for (const k of keys) {
+    if (r[k] !== undefined && r[k] !== null) return r[k];
+    if (snap[k] !== undefined && snap[k] !== null) return snap[k];
+  }
+  return null;
+}
+
+function saleOrderRow(r) {
+  return {
+    id: r.id,
+    number: pick(r, ['number']),
+    issued_at: pick(r, ['issued_at', 'created_at']),
+    auction_title: pick(r, ['auction_title']),
+    auction_id: pick(r, ['auction_id']),
+    lot_no: pick(r, ['lot_no']),
+    lot_title: pick(r, ['lot_title', 'title']),
+    quantity: num(pick(r, ['quantity', 'qty'])),
+    unit: pick(r, ['unit']) || '',
+    rate: num(pick(r, ['rate', 'winning_bid', 'bid_amount', 'amount_per_unit'])),
+    material_value: num(pick(r, ['material_value', 'value', 'amount', 'material_amount'])),
+    commission: num(pick(r, ['commission', 'commission_amount'])),
+    commission_total: num(pick(r, ['commission_total'])),
+    commission_percent: num(pick(r, ['commission_percent'])),
+  };
+}
+
+function invoiceRow(r) {
+  const total = num(pick(r, ['total']));
+  const paid = num(pick(r, ['paid', 'amount_paid', 'paid_amount'])) || 0;
+  const balanceRaw = num(pick(r, ['balance', 'balance_due', 'outstanding']));
+  const status = pick(r, ['status']) || 'unpaid';
+  const due = pick(r, ['due_at', 'due_on', 'due_date']);
+  const balance = balanceRaw !== null ? balanceRaw : (total !== null ? Math.max(0, Math.round((total - paid) * 100) / 100) : null);
+  const overdue = ['unpaid', 'part_paid'].includes(status) && due && new Date(due) < new Date();
+  const tags = { paid: ['Paid', 'tag-ok'], part_paid: ['Part paid', 'tag-warn'], cancelled: ['Cancelled', ''], unpaid: ['Unpaid', 'tag-warn'] };
+  const tag = overdue ? ['Overdue', 'tag-bad'] : (tags[status] || [String(status).replace(/_/g, ' '), '']);
+  return {
+    id: r.id, number: pick(r, ['number']), issued_at: pick(r, ['issued_at', 'created_at']),
+    description: pick(r, ['description', 'title']) || ({ registration_fee: 'Registration fee', commission: "Buyer's commission" }[r.kind] || ''),
+    total, paid, balance: status === 'cancelled' ? 0 : balance, status, tag, due_at: due,
+  };
+}
+
+router.get('/account/billing', wrap(async (req, res) => {
+  const lib = billingLib();
+  let saleOrders = []; let invoices = []; let unavailable = false;
+  if (lib && typeof lib.listForUser === 'function') {
+    try {
+      const out = (await lib.listForUser(req.user.id)) || {};
+      saleOrders = (out.saleOrders || []).map(saleOrderRow);
+      invoices = (out.invoices || []).map(invoiceRow);
+    } catch (err) {
+      console.error('billing list', err.message);
+      unavailable = true;
+    }
+  } else {
+    unavailable = true;
+  }
+  res.page('account/billing', {
+    title: 'Sale orders and invoices', tab: 'billing', saleOrders, invoices, unavailable,
+    pdfs: !!(lib && typeof lib.saleOrderPdf === 'function'), invoicePdfs: !!(lib && typeof lib.invoicePdf === 'function'),
+  });
+}));
+
+const docMissing = (res) => res.status(404).render('error', { title: 'Document not found', message: 'This document does not exist or does not belong to your account.' });
+const pdfName = (number, fallback) => (String(number || fallback).replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '') || fallback) + '.pdf';
+
+/** Serve a billing PDF that belongs to the signed-in bidder. table is a fixed name, never request data. */
+function pdfRoute(table, fn, fallback) {
+  return wrap(async (req, res) => {
+    const id = toInt(req.params.id, 0);
+    const doc = id ? await db.one(`SELECT id, number FROM ${table} WHERE id = $1 AND user_id = $2`, [id, req.user.id]) : null;
+    if (!doc) return docMissing(res);
+    const lib = billingLib();
+    if (!lib || typeof lib[fn] !== 'function') {
+      return res.status(503).render('error', { title: 'Document not available yet', message: 'PDF copies are not available at the moment. Try again later or contact us for a copy.' });
+    }
+    const buf = await lib[fn](doc.id);
+    if (!buf || !buf.length) return docMissing(res);
+    res.set('Content-Type', 'application/pdf');
+    res.set('X-Content-Type-Options', 'nosniff');
+    res.set('Content-Disposition', `inline; filename="${pdfName(doc.number, fallback + '-' + doc.id)}"`);
+    res.set('Cache-Control', 'private, no-store');
+    res.send(Buffer.isBuffer(buf) ? buf : Buffer.from(buf));
+  });
+}
+router.get('/account/billing/sale-orders/:id.pdf', pdfRoute('sale_orders', 'saleOrderPdf', 'sale-order'));
+router.get('/account/billing/invoices/:id.pdf', pdfRoute('invoices', 'invoicePdf', 'invoice'));
 
 router.get('/account/payments', wrap(async (req, res) => {
   const rows = await db.many('SELECT * FROM payments WHERE user_id = $1 ORDER BY created_at DESC LIMIT 200', [req.user.id]);

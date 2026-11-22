@@ -5,6 +5,7 @@ var lotsTxt = a.lot_count + (a.lot_count === 1 ? ' lot' : ' lots');
   <div class="media">
     <div class="badges">
       <% if (live) { %><span class="tag tag-live">Live</span><% } else if (up) { %><span class="tag tag-upcoming">Upcoming</span><% } else { %><span class="tag">Closed</span><% } %>
+      <% if (a.visibility === 'restricted') { %><span class="tag">Invitation only</span><% } %>
     </div>
     <% if (a.cover_id) { %>
       <img src="/media/<%= a.cover_id %>?size=thumb" alt="" loading="lazy" width="640" height="400">
@@ -28,6 +29,9 @@ var lotsTxt = a.lot_count + (a.lot_count === 1 ? ' lot' : ' lots');
       <% } else if (up) { %><span>Starts in</span><b class="countdown" data-countdown="<%= a.startAt %>" data-done="Starting"></b>
       <% } else { %><span>Closed on</span><b class="tnum"><%= fmtDate(a.closed_at || a.ends_at) %></b><% } %>
     </div>
-    <a class="btn btn-sm <%= live ? 'btn-accent' : 'btn-quiet' %>" href="/auctions/<%= a.id %>" tabindex="-1" aria-hidden="true"><%= live ? 'Bid now' : up ? 'View lots' : 'View results' %></a>
+    <div class="foot-act">
+      <% if (live || up) { %><%- include('../partials/watch', { auctionId: a.id, watching: !!a.watching, compact: true }) %><% } %>
+      <a class="btn btn-sm <%= live ? 'btn-accent' : 'btn-quiet' %>" href="/auctions/<%= a.id %>" tabindex="-1" aria-hidden="true"><%= live ? 'Bid now' : up ? 'View lots' : 'View results' %></a>
+    </div>
   </div>
 </article>

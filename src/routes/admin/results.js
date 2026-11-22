@@ -6,6 +6,7 @@ const { clean, toInt, fmtDT, bidderNo } = require('../../lib/util');
 const { wrap, audit } = require('../../middleware');
 const { paginate, notFound, sendCsv, back, label } = require('./helpers');
 const { lotPhotos } = require('./media-helpers');
+const settings = require('../../lib/settings');
 
 const router = express.Router();
 const FILTERS = { pending: 'Awaiting decision', awarded: 'Awarded', rejected: 'Rejected', no_bids: 'No bids' };
@@ -14,10 +15,29 @@ const RESULT_SELECT = `
   SELECT l.id, l.lot_no, l.title, l.quantity, l.unit, l.reserve_price, l.ends_at, l.status, l.result, l.result_note,
          a.id AS auction_id, a.title AS auction_title,
          w.id AS bid_id, w.amount, w.user_id, u.name, u.company_name, u.phone, u.email,
-         (SELECT count(*)::int FROM bids b WHERE b.lot_id = l.id AND NOT b.cancelled) AS bid_count
+         (SELECT count(*)::int FROM bids b WHERE b.lot_id = l.id AND NOT b.cancelled) AS bid_count,
+         l.commission_percent, g.commission_percent AS group_pct, so.id AS so_id, so.number AS so_number
     FROM lots l JOIN auctions a ON a.id = l.auction_id
     LEFT JOIN bids w ON w.id = l.winning_bid_id
-    LEFT JOIN users u ON u.id = w.user_id`;
+    LEFT JOIN users u ON u.id = w.user_id
+    LEFT JOIN bidder_groups g ON g.id = u.group_id
+    LEFT JOIN sale_orders so ON so.lot_id = l.id`;
+
+const r2 = (n) => Math.round(n * 100) / 100;
+/**
+ * Buyer's commission on a result row: the rate frozen when the lot was awarded, else the winner's
+ * group rate, else the default. Adds value, pct, commission, commissionTax and payable (all INR).
+ */
+function withCommission(r) {
+  if (!r || r.amount === null || r.amount === undefined) return r;
+  const pct = r.commission_percent ?? r.group_pct ?? settings.num('default_commission_percent');
+  r.value = r2(r.amount * r.quantity);
+  r.pct = Number(pct) || 0;
+  r.commission = r2(r.value * r.pct / 100);
+  r.commissionTax = r2(r.commission * settings.num('commission_gst_percent') / 100);
+  r.payable = r2(r.value + r.commission + r.commissionTax);
+  return r;
+}
 
 router.get('/results', wrap(async (req, res) => {
   const filter = FILTERS[req.query.result] ? req.query.result : 'pending';
@@ -27,13 +47,18 @@ router.get('/results', wrap(async (req, res) => {
   const pg = paginate(n, req.query.page, 50);
   const rows = await db.many(`${RESULT_SELECT} ${where} ORDER BY l.ends_at ${filter === 'pending' ? 'ASC' : 'DESC'}, a.id, l.lot_no LIMIT $3 OFFSET $4`,
     [filter, auctionId, pg.per, pg.offset]);
+  rows.forEach(withCommission);
+  const sums = rows.reduce((t, r) => ({ value: r2(t.value + (r.value || 0)), commission: r2(t.commission + (r.commission || 0)), payable: r2(t.payable + (r.payable || 0)) }), { value: 0, commission: 0, payable: 0 });
   const counts = Object.fromEntries((await db.many(
     `SELECT l.result, count(*)::int AS n FROM lots l WHERE l.status = 'closed' AND ($1::int IS NULL OR l.auction_id = $1) GROUP BY l.result`, [auctionId]
   )).map((r) => [r.result, r.n]));
   const auctions = await db.many(
     `SELECT DISTINCT a.id, a.title, a.ends_at FROM auctions a JOIN lots l ON l.auction_id = a.id WHERE l.status = 'closed' ORDER BY a.ends_at DESC LIMIT 200`
   );
-  res.adminPage('admin/results', { title: 'Results', rows, pg, filter, FILTERS, counts, auctionId, auctions });
+  res.adminPage('admin/results', {
+    title: 'Results', rows, pg, filter, FILTERS, counts, auctionId, auctions, sums,
+    gstPct: settings.num('commission_gst_percent'), styles: ['/css/admin-extra.css', '/css/admin-billing.css'],
+  });
 }));
 
 router.post('/lots/:id(\\d+)/decide', wrap(async (req, res) => {
@@ -55,7 +80,7 @@ router.post('/lots/:id(\\d+)/decide', wrap(async (req, res) => {
 }));
 
 router.get('/lots/:id(\\d+)', wrap(async (req, res) => {
-  const lot = await db.one(`${RESULT_SELECT} WHERE l.id = $1`, [req.params.id]);
+  const lot = withCommission(await db.one(`${RESULT_SELECT} WHERE l.id = $1`, [req.params.id]));
   if (!lot) return notFound(res, 'This lot');
   const full = await db.one(
     `SELECT l.*, ${bidding.PHASE_SQL} AS phase, a.title AS auction_title, a.show_highest_bid, a.auto_award
@@ -81,13 +106,15 @@ router.get('/auctions/:id(\\d+)/results.csv', wrap(async (req, res) => {
   if (!a) return res.status(404).end();
   const rows = await db.many(`${RESULT_SELECT} WHERE a.id = $1 ORDER BY l.lot_no`, [a.id]);
   const out = [['Lot no', 'Lot', 'Quantity', 'Unit', 'Status', 'Result', 'Bids', 'Highest bid (INR)', 'Total value (INR)', 'Reserve (INR)', 'Reserve met',
-    'Bidder no', 'Bidder', 'Company', 'Phone', 'Email', 'Closed at (IST)', 'Decision note']];
+    'Bidder no', 'Bidder', 'Company', 'Phone', 'Email', 'Closed at (IST)', 'Decision note', 'Commission %', 'Commission (INR)', 'Sale order']];
   for (const r of rows) {
+    withCommission(r);
     out.push([r.lot_no, r.title, r.quantity, r.unit, r.status === 'open' ? 'Open' : 'Closed', r.result ? label('result', r.result) : '', r.bid_count,
       r.amount ?? '', r.amount ? Math.round(r.amount * r.quantity * 100) / 100 : '', r.reserve_price ?? '',
       r.reserve_price === null ? 'No reserve' : r.amount === null ? '' : r.amount >= r.reserve_price ? 'Yes' : 'No',
       r.user_id ? bidderNo(r.user_id) : '', r.name || '', r.company_name || '', r.phone || '', r.email || '',
-      r.status === 'closed' ? fmtDT(r.ends_at) : '', r.result_note]);
+      r.status === 'closed' ? fmtDT(r.ends_at) : '', r.result_note,
+      r.result === 'awarded' || r.result === 'pending' ? r.pct ?? '' : '', r.result === 'awarded' || r.result === 'pending' ? r.commission ?? '' : '', r.so_number || '']);
   }
   audit(req, 'auction.export_results', `#${a.id}`);
   sendCsv(res, `results-auction-${a.id}.csv`, out);

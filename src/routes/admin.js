@@ -86,5 +86,9 @@ router.use(require('./admin/emails'));
 router.use(require('./admin/content'));
 router.use(require('./admin/settings'));
 router.use(require('./admin/team'));
+// Round 3 modules. Mounted only when present so the app boots while they are being written.
+for (const m of ['groups', 'codes', 'billing', 'reports', 'excel']) {
+  if (require('fs').existsSync(require('path').join(__dirname, 'admin', m + '.js'))) router.use(require('./admin/' + m));
+}
 
 module.exports = router;

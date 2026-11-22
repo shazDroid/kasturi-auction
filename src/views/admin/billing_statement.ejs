@@ -1,0 +1,75 @@
+<%
+  var u = st.user;
+  var qs = (st.from ? 'from=' + st.from + '&' : '') + 'to=' + st.to;
+  var base = '/admin/billing/statement/' + u.id;
+%>
+<div class="page-head">
+  <div>
+    <h1>Statement: <%= u.company_name || u.name %></h1>
+    <p><span class="code"><%= bidderNo(u.id) %></span> <a href="/admin/bidders/<%= u.id %>"><%= u.name %></a>. Invoices are debits on their issue date and payments are credits on the day received. Cancelled invoices are left out.</p>
+  </div>
+  <div class="row">
+    <a class="btn btn-quiet" href="<%= base %>.pdf?<%= qs %>" target="_blank" rel="noopener">PDF</a>
+    <a class="btn btn-quiet" href="<%= base %>.xlsx?<%= qs %>">Excel</a>
+    <a class="btn" href="/admin/billing/invoices/new?user=<%= u.id %>">New invoice</a>
+  </div>
+</div>
+
+<form class="filters" method="get" action="<%= base %>">
+  <label for="f-from">From</label>
+  <input type="date" id="f-from" name="from" value="<%= st.from %>">
+  <label for="f-to">to</label>
+  <input type="date" id="f-to" name="to" value="<%= st.to %>">
+  <button class="btn btn-quiet" type="submit">Show</button>
+  <% if (st.from) { %><a href="<%= base %>">From the first entry</a><% } %>
+</form>
+
+<div class="stats">
+  <div class="stat"><b><%= fmtINR(st.opening) || '₹0' %></b><span>Opening balance</span></div>
+  <div class="stat"><b><%= fmtINR(st.totals.debit) || '₹0' %></b><span>Invoiced in this period</span></div>
+  <div class="stat"><b><%= fmtINR(st.totals.credit) || '₹0' %></b><span>Received in this period</span></div>
+  <div class="stat"><b><%= fmtINR(st.closing) || '₹0' %></b><span>Balance due on <%= fmtDate(st.to + 'T12:00:00+05:30') %></span></div>
+</div>
+
+<div class="table-wrap">
+  <table class="table table-stack">
+    <thead><tr><th>Date</th><th>Document</th><th>Description</th><th class="num">Debit</th><th class="num">Credit</th><th class="num">Balance</th></tr></thead>
+    <tbody>
+      <tr><td class="cell-main"><%= st.from ? fmtDate(st.from + 'T12:00:00+05:30') : '' %></td><td></td><td data-label="Description">Opening balance</td><td></td><td></td><td class="num" data-label="Balance"><%= fmtINR(st.opening) || '₹0' %></td></tr>
+      <% st.rows.forEach(function (r) { %>
+        <tr>
+          <td class="cell-main nowrap"><%= fmtDate(r.date) %></td>
+          <td data-label="Document"><a href="/admin/billing/invoices/<%= r.inv_id %>"><%= r.number %></a></td>
+          <td data-label="Description"><%= r.description %></td>
+          <td class="num" data-label="Debit"><%= r.debit ? fmtINR(r.debit) : '' %></td>
+          <td class="num" data-label="Credit"><%= r.credit ? fmtINR(r.credit) : '' %></td>
+          <td class="num" data-label="Balance"><b><%= fmtINR(r.balance) || '₹0' %></b></td>
+        </tr>
+      <% }) %>
+      <% if (!st.rows.length) { %><tr><td colspan="6" class="muted">No invoices or payments in this period.</td></tr><% } %>
+    </tbody>
+    <tfoot><tr><td colspan="3">Closing balance</td><td class="num"><%= fmtINR(st.totals.debit) || '₹0' %></td><td class="num"><%= fmtINR(st.totals.credit) || '₹0' %></td><td class="num"><%= fmtINR(st.closing) || '₹0' %></td></tr></tfoot>
+  </table>
+</div>
+
+<% if (saleOrders.length) { %>
+<section class="admin-section">
+  <h2>Sale orders</h2>
+  <p class="muted small">Material is paid to the seller directly, so sale orders are not part of the balance above.</p>
+  <div class="table-wrap">
+    <table class="table table-stack">
+      <thead><tr><th>Number</th><th>Lot</th><th class="num">Material value</th><th class="num">Commission</th></tr></thead>
+      <tbody>
+      <% saleOrders.forEach(function (o) { %>
+        <tr>
+          <td class="cell-main"><a class="primary" href="/admin/billing/sale-orders/<%= o.id %>"><%= o.number %></a><span class="sub"><%= fmtDate(o.issued_at) %></span></td>
+          <td data-label="Lot">Lot <%= o.snapshot.lot.lot_no %>: <%= o.snapshot.lot.title %><span class="sub clip"><%= o.snapshot.auction.title %></span></td>
+          <td class="num" data-label="Material value"><%= fmtINR(o.snapshot.material_value) %></td>
+          <td class="num" data-label="Commission"><%= fmtINR(o.snapshot.commission) || '₹0' %></td>
+        </tr>
+      <% }) %>
+      </tbody>
+    </table>
+  </div>
+</section>
+<% } %>

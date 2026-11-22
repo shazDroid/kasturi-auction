@@ -63,6 +63,8 @@
               </div>
               <a href="/account"><%- I('dashboard', 18) %>Account overview</a>
               <a href="/account/bids"><%- I('gavel', 18) %>My bids</a>
+              <a href="/account/watchlist"><%- I('eye', 18) %>Watchlist</a>
+              <a href="/account/billing"><%- I('doc', 18) %>Sale orders and invoices</a>
               <a href="/account/verification"><%- I('shield', 18) %>Verification</a>
               <a href="/account/profile"><%- I('factory', 18) %>Business profile</a>
               <a href="/account/payments"><%- I('card', 18) %>Payments</a>
@@ -79,6 +81,30 @@
   </header>
 
   <main id="main">
+    <% if (locals.preview) {
+      var pv = preview, pn = function (n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); };
+      var pvRestrict = 'restricted to ' + pn(pv.groups, 'group') + ' and ' + pn(pv.invites, 'invited bidder');
+    %>
+      <div class="preview-bar" role="status">
+        <div class="wrap">
+          <p><b>Preview.</b>
+            <% if (pv.status === 'draft') { %>This auction is a draft and is not visible to bidders.<% if (pv.restricted) { %> Once published it is <%= pvRestrict %>.<% } %>
+            <% } else if (pv.status === 'cancelled') { %>This auction is cancelled and is not visible to bidders.
+            <% } else { %>This auction is <%= pvRestrict %>.<% } %>
+            <a href="/admin/auctions/<%= pv.auctionId %>">Back to the auction in admin</a></p>
+          <% if (pv.groupList.length) { %>
+            <form class="pv-group" method="get" action="<%= path %>">
+              <label for="pv-group">Start prices for</label>
+              <select id="pv-group" name="as_group">
+                <option value="">All bidders (standard prices)</option>
+                <% pv.groupList.forEach(function (g) { %><option value="<%= g.id %>" <%= pv.asGroup && pv.asGroup.id === g.id ? 'selected' : '' %>><%= g.name %></option><% }) %>
+              </select>
+              <button class="btn btn-quiet btn-sm" type="submit">Show</button>
+            </form>
+          <% } %>
+        </div>
+      </div>
+    <% } %>
     <% if (!locals.fullBleed) { %><div class="wrap"><%- include('partials/flash') %></div><% } %>
     <%- body %>
   </main>

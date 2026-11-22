@@ -1,0 +1,80 @@
+<%
+  var invTag = function (st) { return { unpaid: 'tag tag-warn', part_paid: 'tag tag-upcoming', paid: 'tag tag-ok', cancelled: 'tag' }[st] || 'tag'; };
+  var filtered = f.status || f.kind || f.from || f.to || f.q || f.user;
+%>
+<div class="page-head">
+  <div>
+    <h1>Invoices</h1>
+    <p>Tax invoices for registration fees, buyer's commission and other charges. Dates are IST.</p>
+  </div>
+  <div class="row">
+    <a class="btn btn-quiet" href="<%= urlWith({ page: '' }).replace('/admin/billing/invoices', '/admin/billing/invoices.csv') %>">Download CSV</a>
+    <a class="btn" href="/admin/billing/invoices/new">New invoice</a>
+  </div>
+</div>
+
+<% if (missing > 0) { %>
+  <div class="notice notice-warn bl-notice-row">
+    <p><%= missing %> paid registration fee<%= missing === 1 ? ' has' : 's have' %> no invoice yet, usually because they were paid before invoicing was switched on.</p>
+    <form method="post" action="/admin/billing/invoices/backfill" class="inline-form"><%- include('_csrf') %>
+      <button class="btn btn-sm" type="submit" data-confirm="Raise <%= missing %> paid invoice<%= missing === 1 ? '' : 's' %> for earlier fee payments? They are dated today and are not emailed.">Raise invoices for earlier fee payments</button>
+    </form>
+  </div>
+<% } %>
+
+<form class="filters" method="get" action="/admin/billing/invoices">
+  <label class="sr" for="f-q">Search</label>
+  <input type="search" id="f-q" name="q" value="<%= f.q %>" placeholder="Invoice number, bidder or company">
+  <label class="sr" for="f-status">Status</label>
+  <select id="f-status" name="status">
+    <option value="">Any status</option>
+    <% Object.keys(INV_STATUSES).forEach(function (k) { %><option value="<%= k %>" <%= f.status === k ? 'selected' : '' %>><%= INV_STATUSES[k] %></option><% }) %>
+  </select>
+  <label class="sr" for="f-kind">Kind</label>
+  <select id="f-kind" name="kind">
+    <option value="">Any kind</option>
+    <% Object.keys(KINDS).forEach(function (k) { %><option value="<%= k %>" <%= f.kind === k ? 'selected' : '' %>><%= KINDS[k] %></option><% }) %>
+  </select>
+  <label for="f-from">From</label>
+  <input type="date" id="f-from" name="from" value="<%= f.from %>">
+  <label for="f-to">to</label>
+  <input type="date" id="f-to" name="to" value="<%= f.to %>">
+  <% if (f.user) { %><input type="hidden" name="user" value="<%= f.user %>"><% } %>
+  <button class="btn btn-quiet" type="submit">Filter</button>
+  <% if (filtered) { %><a href="/admin/billing/invoices">Clear filters</a><% } %>
+</form>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty"><h3>No invoices<%= filtered ? ' match these filters' : ' yet' %></h3><p>Fee invoices are raised automatically when a bidder pays. Commission invoices are issued from a sale order. Use New invoice for anything else.</p></div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Number</th><th>Bidder</th><th>Kind</th><th class="num">Total</th><th class="num">Paid</th><th class="num">Balance</th><th>Status</th><th>Due</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (r) { var bal = r.status === 'cancelled' ? 0 : Math.round((r.total - r.paid) * 100) / 100; %>
+      <tr class="<%= r.status === 'cancelled' ? 'void' : '' %>">
+        <td class="cell-main"><a class="primary nowrap" href="/admin/billing/invoices/<%= r.id %>"><%= r.number %></a><span class="sub"><%= fmtDate(r.issued_at) %></span></td>
+        <td data-label="Bidder" class="bl-party"><a href="/admin/billing/statement/<%= r.user_id %>"><%= r.name %></a><span class="sub"><%= r.company_name %></span></td>
+        <td data-label="Kind" class="bl-desc"><%= KINDS[r.kind] || r.kind %><span class="sub clip"><%= r.kind === 'registration_fee' ? '' : r.description %></span></td>
+        <td class="num" data-label="Total"><span class="amt"><%= fmtINR(r.total) %></span></td>
+        <td class="num" data-label="Paid"><%= fmtINR(r.paid) || '₹0' %></td>
+        <td class="num" data-label="Balance"><b><%= fmtINR(bal) || '₹0' %></b></td>
+        <td data-label="Status"><span class="<%= invTag(r.status) %>"><%= { unpaid: 'Unpaid', part_paid: 'Part paid', paid: 'Paid', cancelled: 'Cancelled' }[r.status] || r.status %></span><% if (r.overdue) { %> <span class="tag tag-bad">Overdue</span><% } %></td>
+        <td data-label="Due" class="nowrap"><%= r.due_at ? fmtDate(r.due_at) : '' %></td>
+        <td class="actions"><a href="/admin/billing/invoices/<%= r.id %>.pdf" target="_blank" rel="noopener">PDF</a></td>
+      </tr>
+    <% }) %>
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="3"><%= totals.n %> invoice<%= totals.n === 1 ? '' : 's' %> in this view (totals leave out cancelled ones)</td>
+        <td class="num"><%= fmtINR(totals.total) || '₹0' %></td>
+        <td class="num"><%= fmtINR(totals.paid) || '₹0' %></td>
+        <td class="num"><%= fmtINR(totals.balance) || '₹0' %></td>
+        <td colspan="3"></td>
+      </tr>
+    </tfoot>
+  </table>
+<% } %>
+</div>
+<%- include('_pager') %>

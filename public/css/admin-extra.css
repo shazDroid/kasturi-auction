@@ -176,3 +176,90 @@
   .ax-doc-form { grid-template-columns: 1fr; }
   .ax-gallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+/* ---------- v3: groups, sign-up codes, restricted auctions, previews ---------- */
+.ax-check-cell { width: 36px; }
+.ax-check-cell input { width: 17px; height: 17px; accent-color: var(--ink); margin: 0; vertical-align: middle; }
+.ax-row-label { display: block; margin: 0; font-weight: 400; cursor: pointer; }
+.ax-row-label b { font-weight: 600; color: var(--ink); }
+.ax-bulk { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 12px 0 0; }
+.ax-bulk label { margin: 0; font-weight: 500; }
+.ax-bulk select { width: auto; min-width: 220px; padding: 7px 34px 7px 10px; font-size: 14px; }
+.ax-kv-wide { grid-template-columns: 170px 1fr; }
+.ax-subhead { margin: 22px 0 10px; }
+.ax-legend { font-weight: 500; margin-bottom: 8px; padding: 0; }
+.ax-radios { border: 0; margin: 0 0 6px; padding: 0; }
+.ax-groups-pick { border-top: 1px solid var(--line-soft); padding-top: 14px; margin-top: 4px; }
+.ax-groups-pick fieldset { border: 0; margin: 0; padding: 0; }
+.ax-checklist { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 0 18px; }
+.ax-checklist .check { margin-bottom: 10px; }
+.ax-nobody { margin: 12px 0 0; }
+.ax-nobody[hidden] { display: none; }
+.ax-inline-field { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.ax-inline-field label { margin: 0; width: 100%; font-size: 13px; color: var(--steel); font-weight: 500; }
+.ax-inline-field select { flex: 1 1 140px; width: auto; padding: 7px 34px 7px 10px; font-size: 14px; }
+.ax-preview-as { padding: 10px 14px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); margin-bottom: 16px; }
+.ax-preview-as select { min-width: 200px; }
+.ax-plain-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.ax-break { overflow-wrap: anywhere; word-break: break-word; }
+.ax-upper { text-transform: uppercase; }
+.ax-code { font-size: 14px; letter-spacing: .04em; text-decoration: none; color: var(--ink); }
+a.ax-code:hover { border-color: var(--link); color: var(--link); }
+.ax-code-lg { font: 600 24px/1.1 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .04em; }
+.ax-codes-box { font: 400 15px/1.6 ui-monospace, Menlo, Consolas, monospace; letter-spacing: .04em; max-width: 420px; background: var(--surface); }
+.ax-copied { color: var(--go); font-size: 13px; font-weight: 500; margin-left: 6px; }
+
+/* Dashboard: bidder access strip. */
+.ax-access { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); margin: -10px 0 24px; overflow: hidden; }
+.ax-access a { padding: 11px 18px; border-right: 1px solid var(--line-soft); color: var(--ink-2); text-decoration: none; font-size: 14px; }
+.ax-access a:last-child { border-right: 0; }
+.ax-access a:hover { background: var(--surface); }
+.ax-access b { font-weight: 650; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+/* Lot form: start price by group. */
+.ax-gp-wrap { max-width: 640px; }
+.ax-gp-table th[scope=row] { font-weight: 500; text-align: left; background: transparent; width: 45%; }
+.ax-gp-table th[scope=row] label { margin: 0; font-weight: 500; }
+.ax-gp-table td { vertical-align: top; }
+.ax-gp-input { max-width: 180px; padding: 7px 10px; font-size: 14px; }
+
+/* Forms with a live preview beside them. */
+.ax-with-preview { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 24px; align-items: start; }
+.ax-main-form { min-width: 0; }
+.ax-live-preview { position: sticky; top: 16px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+.ax-live-preview-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+.ax-live-preview-head h2 { font-size: 16px; }
+.ax-live-preview > .hint { margin: 10px 0 0; }
+.ax-card-preview { pointer-events: none; box-shadow: none; }
+.ax-card-preview:hover { transform: none; box-shadow: none; }
+.ax-card-preview:hover .media img { transform: none; }
+.ax-card-preview .meta li[hidden], .ax-card-preview [hidden] { display: none; }
+.ax-card-preview h3 { overflow-wrap: anywhere; }
+.ax-card-preview .foot .btn { pointer-events: none; }
+.ax-lot-pv { border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+.ax-lot-pv [hidden] { display: none; }
+.ax-lot-pv-top { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: start; }
+.ax-lot-pv-img { width: 112px; height: 84px; border-radius: 4px; overflow: hidden; background: var(--surface-2); border: 1px solid var(--line); }
+.ax-lot-pv-img img, .ax-lot-pv-img .ph { display: block; width: 100%; height: 100%; object-fit: cover; }
+.ax-lot-pv-main h3 { font-size: 16px; line-height: 1.25; margin: 2px 0 4px; overflow-wrap: anywhere; }
+.ax-lot-pv-qty { font-size: 14px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.ax-lot-pv-prices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line-soft); }
+.ax-lot-pv-prices dt { font-size: 12px; color: var(--steel); }
+.ax-lot-pv-prices dd { margin: 0; font: 700 18px/1.2 var(--display); font-stretch: 88%; font-variant-numeric: tabular-nums; }
+.ax-lot-pv-gp { margin-top: 8px; color: var(--ink-2); }
+.ax-lot-pv-specs { margin-top: 10px; border-top: 1px solid var(--line-soft); }
+
+@media (max-width: 1180px) {
+  .ax-with-preview { grid-template-columns: 1fr; }
+  .ax-live-preview { position: static; max-width: 420px; }
+}
+@media (max-width: 720px) {
+  .ax-access { grid-template-columns: 1fr; }
+  .ax-access a { border-right: 0; border-bottom: 1px solid var(--line-soft); }
+  .ax-access a:last-child { border-bottom: 0; }
+  .ax-kv-wide { grid-template-columns: max-content 1fr; }
+}
+.ax-issued { min-width: 180px; }
+.ax-card-preview [data-pv="ph"] { height: 100%; }
+.ax-lot-pv-img [data-pv="ph"] { height: 100%; }
+.ax-gp-wrap { margin-bottom: 10px; }

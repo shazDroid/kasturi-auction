@@ -20,6 +20,8 @@ const DEFS = [
   { group: 'Bidder registration', key: 'required_documents', label: 'Documents to collect', type: 'text', def: 'GST certificate, PAN card, Address proof', help: 'Comma separated. Each becomes an upload slot on the bidder verification page.' },
   { group: 'Bidder registration', key: 'business_types', label: 'Business types offered at sign-up', type: 'text', def: 'Trader, Recycler, End user, Manufacturer, Other', help: 'Comma separated.' },
 
+  { group: 'Bidder registration', key: 'require_invite_code', label: 'Businesses need a sign-up code to register', type: 'bool', def: '1', help: 'Generate codes under Bidders, Sign-up codes. Without a valid code the registration form is refused.' },
+
   { group: 'Registration fee', key: 'fee_enabled', label: 'Charge a registration fee before bidding', type: 'bool', def: '1' },
   { group: 'Registration fee', key: 'fee_amount', label: 'Fee amount (₹, before GST)', type: 'number', def: '5000' },
   { group: 'Registration fee', key: 'fee_gst_percent', label: 'GST on fee (%)', type: 'number', def: '18' },
@@ -31,10 +33,25 @@ const DEFS = [
   { group: 'Bidding rules', key: 'max_bid_jump_percent', label: 'Largest single jump above the minimum bid (%)', type: 'number', def: '50', help: 'Blocks typing mistakes such as an extra zero. 0 turns the check off.' },
   { group: 'Bidding rules', key: 'catalogue_public', label: 'Show lots and prices to visitors who are not signed in', type: 'bool', def: '1' },
 
+  { group: 'Bidding rules', key: 'proxy_bidding_enabled', label: 'Allow auto-bidding (bidder sets a maximum and the system bids for them)', type: 'bool', def: '1' },
+  { group: 'Bidding rules', key: 'default_commission_percent', label: "Default buyer's commission (%)", type: 'number', def: '0', help: 'Added on top of the winning amount. A bidder group can have its own rate.' },
+
+  { group: 'Billing and sale orders', key: 'company_legal_name', label: 'Company name printed on sale orders', type: 'text', def: 'Kasturi Auction' },
+  { group: 'Billing and sale orders', key: 'company_gstin', label: 'Company GSTIN', type: 'text', def: '' },
+  { group: 'Billing and sale orders', key: 'sale_order_prefix', label: 'Sale order number prefix', type: 'text', def: 'KA/SO' },
+  { group: 'Billing and sale orders', key: 'invoice_prefix', label: 'Invoice number prefix', type: 'text', def: 'KA/INV' },
+  { group: 'Billing and sale orders', key: 'company_state', label: 'Company state (decides CGST+SGST or IGST on invoices)', type: 'text', def: 'Maharashtra' },
+  { group: 'Billing and sale orders', key: 'commission_gst_percent', label: "GST on buyer's commission (%)", type: 'number', def: '18' },
+  { group: 'Billing and sale orders', key: 'invoice_sac', label: 'SAC code printed on service invoices', type: 'text', def: '998599' },
+  { group: 'Billing and sale orders', key: 'invoice_due_days', label: 'Invoice payment terms (days)', type: 'number', def: '7' },
+  { group: 'Billing and sale orders', key: 'bank_details', label: 'Payment instructions / bank details', type: 'textarea', def: '' },
+  { group: 'Billing and sale orders', key: 'sale_order_terms', label: 'Standard terms printed on every sale order', type: 'textarea', def: 'Payment is due within 3 working days of this sale order. Material must be lifted within the period given in the auction terms. Weighment at the seller\'s weighbridge is final.' },
+
   { group: 'Email', key: 'mail_from_name', label: 'Sender name', type: 'text', def: 'Kasturi Auction' },
   { group: 'Email', key: 'mail_from_email', label: 'Sender email', type: 'email', def: 'no-reply@example.com', help: 'Must be an address your mail provider lets you send from.' },
   { group: 'Email', key: 'admin_notify_email', label: 'Send admin alerts to', type: 'email', def: '', help: 'New document submissions, payments and enquiries.' },
   { group: 'Email', key: 'reminder_minutes_before', label: 'Auction reminder lead time (minutes)', type: 'number', def: '60', help: '0 turns reminders off.' },
+  { group: 'Email', key: 'watch_alert_minutes', label: 'Watchlist alert lead time (minutes)', type: 'number', def: '15', help: 'Bidders watching an auction get an email this long before it starts. 0 turns it off.' },
   { group: 'Email', key: 'email_footer', label: 'Email footer text', type: 'textarea', def: 'You are receiving this email because you have an account with us.' },
 
   { group: 'Maintenance', key: 'maintenance_mode', label: 'Close the public site for maintenance', type: 'bool', def: '0', help: 'The admin panel stays available.' },

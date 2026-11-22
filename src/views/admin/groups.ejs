@@ -1,0 +1,34 @@
+<div class="page-head">
+  <div>
+    <h1>Bidder groups</h1>
+    <p>Groups can pay a different registration fee and buyer's commission, see restricted auctions and open at their own start prices.</p>
+  </div>
+  <a class="btn" href="/admin/groups/new">New group</a>
+</div>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty">
+    <h3>No bidder groups yet</h3>
+    <p>Every bidder pays the default fee of <%= fmtINR(D.fee) %> and the default commission of <%= fmtNum(D.commission) %>%. <a href="/admin/groups/new">Create a group</a>, for example "Recyclers", to set other terms for some bidders.</p>
+  </div>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Group</th><th class="num">Registration fee</th><th class="num">Buyer's commission</th><th class="num">Bidders</th><th class="num">Restricted auctions</th><th class="num">Active codes</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (g) { %>
+      <tr>
+        <td class="cell-main"><a class="primary" href="/admin/groups/<%= g.id %>"><%= g.name %></a><% if (g.description) { %><span class="sub clip"><%= g.description %></span><% } %></td>
+        <td class="num" data-label="Registration fee"><% if (g.fee_amount === null) { %><span class="muted">Default (<%= fmtINR(D.fee) %>)</span><% } else { %><%= fmtINR(g.fee_amount) %><% } %></td>
+        <td class="num" data-label="Buyer's commission"><% if (g.commission_percent === null) { %><span class="muted">Default (<%= fmtNum(D.commission) %>%)</span><% } else { %><%= fmtNum(g.commission_percent) %>%<% } %></td>
+        <td class="num" data-label="Bidders"><a href="/admin/bidders?group=<%= g.id %>"><%= fmtNum(g.member_count) %></a></td>
+        <td class="num" data-label="Restricted auctions"><%= g.auction_count %></td>
+        <td class="num" data-label="Active codes"><% if (g.active_codes) { %><a href="/admin/codes?group=<%= g.id %>&amp;status=active"><%= g.active_codes %></a><% } else { %>0<% } %></td>
+        <td class="actions"><a href="/admin/groups/<%= g.id %>">Open</a><a href="/admin/groups/<%= g.id %>/edit">Edit</a></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+</div>
+<p class="muted small mt">Fees are before GST. <%= fmtNum(ungrouped) %> bidder<%= ungrouped === 1 ? ' is' : 's are' %> not in any group and <%= ungrouped === 1 ? 'pays' : 'pay' %> the defaults from <a href="/admin/settings">Settings</a>. <a href="/admin/bidders?group=none">See them</a>.</p>

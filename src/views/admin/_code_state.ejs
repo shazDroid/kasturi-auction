@@ -1,0 +1,1 @@
+<%# Status tag of a sign-up code. Expects s: active | used | expired | inactive. %><% var CS = { active: ['tag tag-ok', 'Active'], used: ['tag', 'Used up'], expired: ['tag tag-warn', 'Expired'], inactive: ['tag tag-bad', 'Deactivated'] }; var cs = CS[s] || CS.inactive; %><span class="<%= cs[0] %>"><%= cs[1] %></span>

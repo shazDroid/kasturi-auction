@@ -1,0 +1,47 @@
+<%# Extra lot detail sections (added by routes/admin/auctions.js to the results lot page). Expects prices, proxies, lotId, lotStart. %>
+<div class="cols-even admin-section">
+  <section id="auto-bids">
+    <div class="row-between section-head"><h2>Active auto-bids</h2><span class="muted small">Only admins see the maximums</span></div>
+    <div class="table-wrap">
+    <% if (!proxies.length) { %>
+      <div class="empty"><h3>No active auto-bids</h3><p>When a bidder sets a maximum, the system bids for them one increment at a time. Active maximums appear here.</p></div>
+    <% } else { %>
+      <table class="table table-stack">
+        <thead><tr><th>Bidder</th><th class="num">Maximum</th><th>Set at</th></tr></thead>
+        <tbody>
+        <% proxies.forEach(function (p) { %>
+          <tr>
+            <td class="cell-main"><a class="primary" href="/admin/bidders/<%= p.user_id %>"><%= p.name %></a><span class="sub"><%= p.company_name %>, <%= bidderNo(p.user_id) %></span><% if (p.blocked) { %> <span class="tag tag-bad">Blocked, not bidding</span><% } %></td>
+            <td class="num" data-label="Maximum"><b><%= fmtINR(p.max_amount) %></b></td>
+            <td data-label="Set at" class="nowrap"><%= fmtDTs(p.updated_at) %><% if (new Date(p.updated_at) - new Date(p.created_at) > 1000) { %><span class="sub">First set <%= fmtDTs(p.created_at) %></span><% } %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+    </div>
+    <p class="muted small mt">Cancelling a bidder's bid also stops their auto-bid on this lot.</p>
+  </section>
+  <section id="group-prices">
+    <div class="row-between section-head"><h2>Start price by group</h2><a href="/admin/lots/<%= lotId %>/edit#group-prices">Edit</a></div>
+    <div class="table-wrap">
+    <% if (!prices.length) { %>
+      <div class="empty"><h3>Same start price for everyone</h3><p>Every bidder opens at <%= fmtINR(lotStart) %>. Set a different start price for a bidder group on the lot's edit page.</p></div>
+    <% } else { %>
+      <table class="table table-stack">
+        <thead><tr><th>Group</th><th class="num">Start price</th><th class="num">Difference</th></tr></thead>
+        <tbody>
+          <tr><td class="cell-main">Everyone else</td><td class="num" data-label="Start price"><%= fmtINR(lotStart) %></td><td class="num muted" data-label="Difference">Lot price</td></tr>
+        <% prices.forEach(function (p) { var d = Math.round((p.start_price - lotStart) * 100) / 100; %>
+          <tr>
+            <td class="cell-main"><a class="primary" href="/admin/groups/<%= p.id %>"><%= p.name %></a></td>
+            <td class="num" data-label="Start price"><b><%= fmtINR(p.start_price) %></b></td>
+            <td class="num" data-label="Difference"><%= d === 0 ? 'Same' : (d > 0 ? '+' : '-') + fmtINR(Math.abs(d)) %></td>
+          </tr>
+        <% }) %>
+        </tbody>
+      </table>
+    <% } %>
+    </div>
+  </section>
+</div>

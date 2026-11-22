@@ -1,0 +1,37 @@
+<div class="wrap" data-server-now="<%= serverNow %>">
+  <%- include('_nav') %>
+  <div class="page-head">
+    <h1>Watchlist</h1>
+    <p>Auctions you are keeping an eye on.<% if (alertMinutes > 0) { %> We email you <%= alertMinutes %> minutes before bidding opens on each one.<% } %></p>
+  </div>
+  <% if (!rows.length) { %>
+    <div class="table-wrap"><div class="empty"><h3>You are not watching any auctions</h3><p>Open an auction from the <a href="/auctions">auction schedule</a> and choose Watch this auction. It will be listed here.</p></div></div>
+  <% } else { %>
+    <div class="table-wrap">
+      <table class="table table-stack">
+        <thead><tr><th>Auction</th><th>Location</th><th class="num">Lots</th><th>Bidding window</th><th>Status</th><th><span class="sr">Remove</span></th></tr></thead>
+        <tbody>
+          <% rows.forEach(function (w) { var live = w.phase === 'live', up = w.phase === 'upcoming'; %>
+            <tr>
+              <td class="cell-main"><a class="primary" href="/auctions/<%= w.id %>"><%= w.title %></a><span class="sub"><%= w.seller_name || w.category %><% if (w.visibility === 'restricted') { %> <span class="tag">Invitation only</span><% } %></span></td>
+              <td data-label="Location"><%= w.location || 'On request' %></td>
+              <td class="num" data-label="Lots"><%= w.lot_count %></td>
+              <td data-label="Bidding window"><%= fmtDT(w.starts_at) %><span class="sub">to <%= fmtDT(w.ends_at) %></span></td>
+              <td data-label="Status" class="nowrap">
+                <% if (live) { %><span class="tag tag-live">Live</span><span class="sub">Closes in <span class="countdown" data-countdown="<%= new Date(w.last_close || w.ends_at).getTime() %>" data-done="Closing"></span></span>
+                <% } else if (up) { %><span class="tag tag-upcoming">Upcoming</span><span class="sub">Starts in <span class="countdown" data-countdown="<%= new Date(w.starts_at).getTime() %>" data-done="Starting"></span></span>
+                <% } else { %><span class="tag">Closed</span><span class="sub"><%= fmtDate(w.closed_at || w.ends_at) %></span><% } %>
+              </td>
+              <td class="actions" data-label="">
+                <form class="inline-form" method="post" action="/auctions/<%= w.id %>/unwatch">
+                  <input type="hidden" name="_csrf" value="<%= csrf %>">
+                  <button class="linkbtn" type="submit">Remove<span class="sr"> <%= w.title %> from the watchlist</span></button>
+                </form>
+              </td>
+            </tr>
+          <% }) %>
+        </tbody>
+      </table>
+    </div>
+  <% } %>
+</div>

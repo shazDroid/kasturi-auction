@@ -1,0 +1,41 @@
+<div class="page-head">
+  <div>
+    <h1><%= group ? 'Edit group' : 'New bidder group' %></h1>
+    <p><%= group ? group.name : 'Bidders in a group pay its fee and commission instead of the defaults.' %></p>
+  </div>
+</div>
+
+<% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. The group was not saved.</div><% } %>
+
+<form method="post" action="<%= group ? '/admin/groups/' + group.id : '/admin/groups' %>" class="panel mid" novalidate>
+  <div class="panel-body">
+    <%- include('_csrf') %>
+    <div class="field">
+      <label for="name">Group name</label>
+      <input type="text" id="name" name="name" value="<%= v.name %>" maxlength="100" required placeholder="For example Recyclers">
+      <%- include('_err', { k: 'name' }) %>
+    </div>
+    <div class="field">
+      <label for="description">Description</label>
+      <textarea id="description" name="description" rows="2" maxlength="500" placeholder="Who belongs in this group. Only admins see it."><%= v.description %></textarea>
+    </div>
+    <div class="form-grid">
+      <div class="field">
+        <label for="fee_amount">Registration fee (₹, before GST)</label>
+        <input type="text" id="fee_amount" name="fee_amount" inputmode="decimal" value="<%= v.fee_amount === null || Number.isNaN(v.fee_amount) ? '' : v.fee_amount %>" placeholder="<%= D.fee %>">
+        <%- include('_err', { k: 'fee_amount' }) %>
+        <div class="hint">Leave empty to use the default of <%= fmtINR(D.fee) %>. 0 means bidders in this group pay no fee.</div>
+      </div>
+      <div class="field">
+        <label for="commission_percent">Buyer's commission (%)</label>
+        <input type="text" id="commission_percent" name="commission_percent" inputmode="decimal" value="<%= v.commission_percent === null || Number.isNaN(v.commission_percent) ? '' : v.commission_percent %>" placeholder="<%= D.commission %>">
+        <%- include('_err', { k: 'commission_percent' }) %>
+        <div class="hint">Leave empty to use the default of <%= fmtNum(D.commission) %>%. The rate is fixed on each lot when it is awarded.</div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit"><%= group ? 'Save group' : 'Create group' %></button>
+      <a class="btn btn-quiet" href="<%= group ? '/admin/groups/' + group.id : '/admin/groups' %>">Cancel</a>
+    </div>
+  </div>
+</form>

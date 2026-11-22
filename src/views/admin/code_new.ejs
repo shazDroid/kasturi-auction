@@ -1,0 +1,60 @@
+<div class="page-head">
+  <div>
+    <h1>Generate sign-up codes</h1>
+    <p>Codes look like KA-7F3K-9QXD. Letters and digits that are easy to confuse (0, O, 1, I) are never used.</p>
+  </div>
+</div>
+
+<%- include('_code_notice') %>
+
+<% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. No codes were created.</div><% } %>
+
+<form method="post" action="/admin/codes" class="panel mid" novalidate>
+  <div class="panel-body">
+    <%- include('_csrf') %>
+    <div class="form-grid">
+      <div class="field">
+        <label for="count">How many codes</label>
+        <input type="number" id="count" name="count" value="<%= v.count %>" min="1" max="<%= MAX_BATCH %>" step="1" required>
+        <%- include('_err', { k: 'count' }) %>
+        <div class="hint">1 to <%= MAX_BATCH %>. Make one code per business so you can see who registered with which.</div>
+      </div>
+      <div class="field">
+        <label for="max_uses">Registrations allowed per code</label>
+        <input type="number" id="max_uses" name="max_uses" value="<%= v.max_uses %>" min="1" step="1" required>
+        <%- include('_err', { k: 'max_uses' }) %>
+        <div class="hint">1 for a personal code. A higher number lets one code be shared, for example at a trade meet.</div>
+      </div>
+      <div class="field">
+        <label for="prefix">Prefix</label>
+        <input type="text" id="prefix" name="prefix" value="<%= v.prefix %>" maxlength="8" class="ax-upper" autocomplete="off">
+        <%- include('_err', { k: 'prefix' }) %>
+        <div class="hint">Optional. Up to 8 letters and digits, for example KA or PUNE26.</div>
+      </div>
+      <div class="field">
+        <label for="expires_on">Expires on</label>
+        <input type="date" id="expires_on" name="expires_on" value="<%= v.expires_on %>">
+        <%- include('_err', { k: 'expires_on' }) %>
+        <div class="hint">Optional. The code works until the end of this day, IST.</div>
+      </div>
+      <div class="field">
+        <label for="group_id">Bidders join this group</label>
+        <select id="group_id" name="group_id">
+          <option value="">No group (default fee and commission)</option>
+          <% groups.forEach(function (g) { %><option value="<%= g.id %>" <%= Number(v.group_id) === g.id ? 'selected' : '' %>><%= g.name %></option><% }) %>
+        </select>
+        <%- include('_err', { k: 'group_id' }) %>
+        <% if (!groups.length) { %><div class="hint"><a href="/admin/groups/new">Create a bidder group</a> first if these businesses should get their own terms.</div><% } %>
+      </div>
+      <div class="field">
+        <label for="label">Issued to</label>
+        <input type="text" id="label" name="label" value="<%= v.label %>" maxlength="200" placeholder="For example Pune scrap dealers meet, Nov 2026">
+        <div class="hint">A note for your team. Bidders never see it.</div>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" type="submit">Generate codes</button>
+      <a class="btn btn-quiet" href="/admin/codes">Cancel</a>
+    </div>
+  </div>
+</form>

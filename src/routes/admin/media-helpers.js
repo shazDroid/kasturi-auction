@@ -85,6 +85,7 @@ async function deleteFilesIfUnused(ids) {
   const r = await db.query(
     `DELETE FROM files f WHERE f.id = ANY($1::int[])
         AND NOT EXISTS (SELECT 1 FROM lot_images li WHERE li.file_id = f.id)
+        AND NOT EXISTS (SELECT 1 FROM auction_images ai WHERE ai.file_id = f.id)
         AND NOT EXISTS (SELECT 1 FROM auctions a WHERE a.cover_id = f.id)
         AND NOT EXISTS (SELECT 1 FROM sellers s WHERE s.logo_id = f.id)
         AND NOT EXISTS (SELECT 1 FROM auction_documents d WHERE d.file_id = f.id)
@@ -136,7 +137,52 @@ const lotPhotos = (lotId) => db.many(
     WHERE li.lot_id = $1 ORDER BY li.sort_order, li.id`, [lotId]
 );
 
+/** Photos of an auction in display order; the first one is the cover. */
+const auctionPhotos = (auctionId) => db.many(
+  `SELECT ai.id, ai.file_id, ai.sort_order, f.filename, f.size, f.width, f.height
+     FROM auction_images ai JOIN files f ON f.id = ai.file_id
+    WHERE ai.auction_id = $1 ORDER BY ai.sort_order, ai.id`, [auctionId]
+);
+
+/**
+ * Keep auctions.cover_id equal to the auction's first photo (or NULL when it has none).
+ * Call after every change to auction_images. q may be a transaction client.
+ */
+async function syncAuctionCover(auctionId, q = db) {
+  await q.query(
+    `UPDATE auctions SET cover_id = (SELECT ai.file_id FROM auction_images ai WHERE ai.auction_id = $1 ORDER BY ai.sort_order, ai.id LIMIT 1)
+      WHERE id = $1`, [auctionId]
+  );
+}
+
+/** Append stored photos after the current last photo of a lot or auction. kind: 'lot' | 'auction'. */
+async function appendPhotos(kind, ownerId, fileIds) {
+  if (!fileIds || !fileIds.length) return;
+  const [table, col] = kind === 'auction' ? ['auction_images', 'auction_id'] : ['lot_images', 'lot_id'];
+  await db.tx(async (c) => {
+    const { last } = (await c.query(`SELECT COALESCE(max(sort_order), -1) AS last FROM ${table} WHERE ${col} = $1`, [ownerId])).rows[0];
+    for (let i = 0; i < fileIds.length; i++) {
+      await c.query(`INSERT INTO ${table}(${col}, file_id, sort_order) VALUES($1,$2,$3)`, [ownerId, fileIds[i], last + 1 + i]);
+    }
+    if (kind === 'auction') await syncAuctionCover(ownerId, c);
+  });
+}
+
+/**
+ * New display order for a gallery after op = cover | left | right on photos[idx].
+ * Returns the reordered array, or null for an unknown op.
+ */
+function reorderPhotos(photos, idx, op) {
+  const order = photos.slice();
+  if (op === 'cover') order.unshift(...order.splice(idx, 1));
+  else if (op === 'left') { if (idx > 0) [order[idx - 1], order[idx]] = [order[idx], order[idx - 1]]; }
+  else if (op === 'right') { if (idx < order.length - 1) [order[idx + 1], order[idx]] = [order[idx], order[idx + 1]]; }
+  else return null;
+  return order;
+}
+
 module.exports = {
   MAX_PHOTOS, RICH_MAX, SPEC_ROWS, SPEC_LABEL_MAX, SPEC_VALUE_MAX, SPEC_LABELS, EDITOR_ASSETS,
   uploads, rejectedNames, storeImage, storeImages, checkPhotos, deleteFilesIfUnused, readRich, readSpecs, lotPhotos,
+  auctionPhotos, syncAuctionCover, appendPhotos, reorderPhotos,
 };

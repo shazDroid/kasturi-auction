@@ -1,0 +1,72 @@
+<%
+  var I = function (n, size) { return include('../partials/icon', { name: n, size: size || 16 }); };
+%>
+<div class="wrap">
+  <%- include('_nav') %>
+  <div class="page-head">
+    <h1>Sale orders and invoices</h1>
+    <p>A sale order is issued for every lot awarded to you. Invoices cover the registration fee and any buyer's commission. Open the PDF to print or save a copy.</p>
+  </div>
+
+  <% if (unavailable) { %>
+    <div class="notice"><p>Sale orders and invoices cannot be shown at the moment. Try again later, or contact us at <a href="mailto:<%= S.contact_email %>"><%= S.contact_email %></a> for a copy.</p></div>
+  <% } %>
+
+  <section>
+    <div class="section-head"><h2>Sale orders</h2></div>
+    <% if (!saleOrders.length) { %>
+      <div class="table-wrap"><div class="empty"><h3>No sale orders yet</h3><p>When a lot is awarded to you, its sale order is listed here and emailed to you. See where you stand on open lots under <a href="/account/bids">My bids</a>.</p></div></div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="table table-stack">
+          <thead><tr><th>Sale order</th><th>Date</th><th>Auction and lot</th><th class="num">Quantity</th><th class="num">Rate</th><th class="num">Material value</th><th class="num">Commission</th><th><span class="sr">PDF</span></th></tr></thead>
+          <tbody>
+            <% saleOrders.forEach(function (o) { %>
+              <tr>
+                <td class="cell-main"><span class="primary code"><%= o.number %></span></td>
+                <td data-label="Date" class="nowrap"><%= o.issued_at ? fmtDate(o.issued_at) : '' %></td>
+                <td data-label="Auction and lot"><%= o.lot_no !== null ? 'Lot ' + o.lot_no + ': ' : '' %><%= o.lot_title || '' %><% if (o.auction_title) { %><span class="sub"><%= o.auction_title %></span><% } %></td>
+                <td class="num" data-label="Quantity"><%= o.quantity !== null ? fmtNum(o.quantity) + ' ' + o.unit : '' %></td>
+                <td class="num" data-label="Rate"><%= o.rate !== null ? fmtINR(o.rate) : '' %><% if (o.rate !== null && o.unit) { %><span class="sub">per <%= o.unit %></span><% } %></td>
+                <td class="num" data-label="Material value"><%= o.material_value !== null ? fmtINR(o.material_value) : '' %></td>
+                <td class="num" data-label="Commission"><%= o.commission ? fmtINR(o.commission) : 'None' %><% if (o.commission && o.commission_total && o.commission_total !== o.commission) { %><span class="sub"><%= fmtINR(o.commission_total) %> with GST</span><% } %></td>
+                <td class="actions" data-label=""><% if (pdfs) { %><a class="link-ico" href="/account/billing/sale-orders/<%= o.id %>.pdf" target="_blank" rel="noopener"><%- I('download') %>PDF<span class="sr">, sale order <%= o.number %></span></a><% } %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+
+  <section class="section">
+    <div class="section-head"><h2>Invoices</h2></div>
+    <% if (!invoices.length) { %>
+      <div class="table-wrap"><div class="empty"><h3>No invoices yet</h3><p>Tax invoices for your registration fee and for buyer's commission on awarded lots are listed here.</p></div></div>
+    <% } else { %>
+      <div class="table-wrap">
+        <table class="table table-stack">
+          <thead><tr><th>Invoice</th><th>Date</th><th>Description</th><th class="num">Total</th><th class="num">Paid</th><th class="num">Balance</th><th>Status</th><th>Due</th><th><span class="sr">PDF</span></th></tr></thead>
+          <tbody>
+            <% invoices.forEach(function (v) { %>
+              <tr>
+                <td class="cell-main"><span class="primary code"><%= v.number %></span></td>
+                <td data-label="Date" class="nowrap"><%= v.issued_at ? fmtDate(v.issued_at) : '' %></td>
+                <td data-label="Description"><%= v.description %></td>
+                <td class="num" data-label="Total"><%= v.total !== null ? fmtINR(v.total) : '' %></td>
+                <td class="num" data-label="Paid"><%= fmtINR(v.paid) %></td>
+                <td class="num" data-label="Balance"><b><%= v.balance !== null ? fmtINR(v.balance) : '' %></b></td>
+                <td data-label="Status"><span class="tag <%= v.tag[1] %>"><%= v.tag[0] %></span></td>
+                <td data-label="Due" class="nowrap"><%= v.due_at && v.status !== 'paid' && v.status !== 'cancelled' ? fmtDate(v.due_at) : '' %></td>
+                <td class="actions" data-label=""><% if (invoicePdfs) { %><a class="link-ico" href="/account/billing/invoices/<%= v.id %>.pdf" target="_blank" rel="noopener"><%- I('download') %>PDF<span class="sr">, invoice <%= v.number %></span></a><% } %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </section>
+  <% if (S.bank_details) { %>
+    <div class="panel section"><div class="panel-head"><h3>How to pay</h3></div><div class="panel-body"><%- nl2p(S.bank_details) %></div></div>
+  <% } %>
+</div>

@@ -23,7 +23,7 @@
         <% } %>
         <table class="table fee-table">
           <tbody>
-            <tr><td>Registration fee</td><td class="num"><%= fmtINR(fee.quote.base) %></td></tr>
+            <tr><td>Registration fee<% if (fee.groupFee) { %><span class="sub">Fee for <%= fee.quote.groupName %></span><% } %></td><td class="num"><%= fmtINR(fee.quote.base) %></td></tr>
             <tr><td>GST at <%= fee.quote.gstPercent %>%</td><td class="num"><%= fmtINR(fee.quote.tax) %></td></tr>
             <tr class="total"><td>Total payable</td><td class="num"><%= fmtINR(fee.quote.total) %></td></tr>
           </tbody>

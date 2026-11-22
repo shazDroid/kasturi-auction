@@ -23,10 +23,10 @@
           </td>
           <td class="cell-main"><a class="primary" href="/admin/lots/<%= l.id %>"><%= l.title %></a><% if (l.description) { %><span class="sub clip"><%= excerpt(l.description, 120) %></span><% } %></td>
           <td class="num" data-label="Quantity"><%= fmtNum(l.quantity) %> <%= l.unit %></td>
-          <td class="num" data-label="Opening"><%= fmtINR(l.start_price) %></td>
+          <td class="num" data-label="Opening"><%= fmtINR(l.start_price) %><% if (l.group_price_count) { %><span class="sub"><a href="/admin/lots/<%= l.id %>/edit#group-prices"><%= l.group_price_count %> group price<%= l.group_price_count === 1 ? '' : 's' %></a></span><% } %></td>
           <td class="num" data-label="Raise"><%= fmtINR(l.increment) %></td>
           <td class="num" data-label="Reserve"><%= l.reserve_price === null ? 'None' : fmtINR(l.reserve_price) %></td>
-          <td class="num" data-label="Bids"><%= l.bid_count %></td>
+          <td class="num" data-label="Bids"><%= l.bid_count %><% if (l.auto_count) { %><span class="sub"><a href="/admin/lots/<%= l.id %>#auto-bids"><%= l.auto_count %> auto-bid<%= l.auto_count === 1 ? '' : 's' %></a></span><% } %></td>
           <td class="num" data-label="Highest bid">
             <% if (l.top_amount !== null) { %>
               <b><%= fmtINR(l.top_amount) %></b>

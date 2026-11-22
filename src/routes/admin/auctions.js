@@ -5,7 +5,7 @@ const settings = require('../../lib/settings');
 const bidding = require('../../lib/bidding');
 const worker = require('../../lib/worker');
 const { clean, toInt, toMoney, parseLocal, fmtDT, bidderNo } = require('../../lib/util');
-const { wrap, audit, upload, saveFile, sendFile, isImage } = require('../../middleware');
+const { wrap, audit, upload, saveFile, sendFile } = require('../../middleware');
 const { paginate, notFound, sendCsv, back } = require('./helpers');
 const M = require('./media-helpers');
 
@@ -15,6 +15,14 @@ const { PHASE_SQL } = bidding;
 const UNITS = ['MT', 'KG', 'Nos', 'Lot', 'Ltr', 'Mtr'];
 const PHASES = ['upcoming', 'live', 'closed', 'draft', 'cancelled'];
 const PER = 25;
+const VIS = ['public', 'restricted'];
+const SEARCH_LIMIT = 50;
+
+const arr = (x) => (x === undefined || x === null ? [] : Array.isArray(x) ? x : [x]);
+/** Distinct positive integer ids from a form field that may repeat. */
+const idList = (x) => [...new Set(arr(x).map((v) => toInt(v, 0)).filter((n) => n > 0))];
+const plural = (n, one, many) => `${n} ${n === 1 ? one : many || one + 's'}`;
+const allGroups = () => db.many('SELECT id, name, fee_amount, commission_percent FROM bidder_groups ORDER BY lower(name)');
 
 async function loadAuction(id) {
   return db.one(
@@ -23,7 +31,10 @@ async function loadAuction(id) {
             (SELECT count(*)::int FROM lots l WHERE l.auction_id = a.id AND l.status = 'open') AS lots_open,
             (SELECT count(*)::int FROM bids b JOIN lots l ON l.id = b.lot_id WHERE l.auction_id = a.id) AS bid_count_all,
             (SELECT count(*)::int FROM bids b JOIN lots l ON l.id = b.lot_id WHERE l.auction_id = a.id AND NOT b.cancelled) AS bid_count,
-            (SELECT count(DISTINCT b.user_id)::int FROM bids b JOIN lots l ON l.id = b.lot_id WHERE l.auction_id = a.id AND NOT b.cancelled) AS bidder_count
+            (SELECT count(DISTINCT b.user_id)::int FROM bids b JOIN lots l ON l.id = b.lot_id WHERE l.auction_id = a.id AND NOT b.cancelled) AS bidder_count,
+            (SELECT count(*)::int FROM auction_images ai WHERE ai.auction_id = a.id) AS photo_count,
+            (SELECT count(*)::int FROM auction_groups ag WHERE ag.auction_id = a.id) AS group_count,
+            (SELECT count(*)::int FROM auction_invites ai WHERE ai.auction_id = a.id) AS invite_count
        FROM auctions a LEFT JOIN sellers s ON s.id = a.seller_id WHERE a.id = $1`, [id]
   );
 }
@@ -32,6 +43,8 @@ const lotsOf = (auctionId) => db.many(
   `SELECT l.*, (SELECT count(*)::int FROM bids b WHERE b.lot_id = l.id AND NOT b.cancelled) AS bid_count,
           (SELECT li.file_id FROM lot_images li WHERE li.lot_id = l.id ORDER BY li.sort_order, li.id LIMIT 1) AS cover_file_id,
           (SELECT count(*)::int FROM lot_images li WHERE li.lot_id = l.id) AS photo_count,
+          (SELECT count(*)::int FROM lot_group_prices gp WHERE gp.lot_id = l.id) AS group_price_count,
+          (SELECT count(*)::int FROM proxy_bids p WHERE p.lot_id = l.id AND p.active) AS auto_count,
           t.amount AS top_amount, t.user_id AS top_user, t.name AS top_name, t.company_name AS top_company
      FROM lots l
      LEFT JOIN LATERAL (SELECT b.amount, b.user_id, u.name, u.company_name FROM bids b JOIN users u ON u.id = b.user_id
@@ -54,20 +67,24 @@ const sellersFor = (currentId) => db.many(
 router.get('/auctions', wrap(async (req, res) => {
   const phase = PHASES.includes(req.query.phase) ? req.query.phase : '';
   const q = clean(req.query.q, 100);
-  const where = `WHERE ($1 = '' OR (${PHASE_SQL}) = $1) AND ($2 = '' OR a.title ILIKE '%' || $2 || '%' OR s.name ILIKE '%' || $2 || '%')`;
-  const { n } = await db.one(`SELECT count(*)::int AS n FROM auctions a LEFT JOIN sellers s ON s.id = a.seller_id ${where}`, [phase, q]);
+  const vis = VIS.includes(req.query.vis) ? req.query.vis : '';
+  const where = `WHERE ($1 = '' OR (${PHASE_SQL}) = $1) AND ($2 = '' OR a.title ILIKE '%' || $2 || '%' OR s.name ILIKE '%' || $2 || '%')
+                   AND ($3 = '' OR a.visibility = $3)`;
+  const { n } = await db.one(`SELECT count(*)::int AS n FROM auctions a LEFT JOIN sellers s ON s.id = a.seller_id ${where}`, [phase, q, vis]);
   const pg = paginate(n, req.query.page, PER);
   const rows = await db.many(
-    `SELECT a.id, a.title, a.starts_at, a.ends_at, a.status, ${PHASE_SQL} AS phase, s.name AS seller_name,
+    `SELECT a.id, a.title, a.starts_at, a.ends_at, a.status, a.visibility, ${PHASE_SQL} AS phase, s.name AS seller_name,
+            (SELECT string_agg(g.name, ', ' ORDER BY lower(g.name)) FROM auction_groups ag JOIN bidder_groups g ON g.id = ag.group_id WHERE ag.auction_id = a.id) AS group_names,
+            (SELECT count(*)::int FROM auction_invites ai WHERE ai.auction_id = a.id) AS invite_count,
             (SELECT count(*)::int FROM lots l WHERE l.auction_id = a.id) AS lot_count,
             (SELECT count(*)::int FROM bids b JOIN lots l ON l.id = b.lot_id WHERE l.auction_id = a.id AND NOT b.cancelled) AS bid_count
        FROM auctions a LEFT JOIN sellers s ON s.id = a.seller_id ${where}
       ORDER BY CASE ${PHASE_SQL} WHEN 'live' THEN 0 WHEN 'upcoming' THEN 1 WHEN 'draft' THEN 2 ELSE 3 END,
                CASE WHEN (${PHASE_SQL}) IN ('live','upcoming','draft') THEN a.starts_at END ASC,
                a.starts_at DESC
-      LIMIT $3 OFFSET $4`, [phase, q, PER, pg.offset]
+      LIMIT $4 OFFSET $5`, [phase, q, vis, PER, pg.offset]
   );
-  res.adminPage('admin/auctions', { title: 'Auctions and lots', rows, pg, phase, q, PHASES });
+  res.adminPage('admin/auctions', { title: 'Auctions and lots', rows, pg, phase, q, vis, PHASES });
 }));
 
 // ---------- Create / edit ----------
@@ -78,7 +95,7 @@ function auctionDefaults() {
     title: '', seller_id: null, category: '', location: '', description: '', inspection: '', terms: '',
     starts_at: start, ends_at: new Date(start.getTime() + 3 * 3600000),
     extend_window_min: settings.num('default_extend_window_min'), extend_by_min: settings.num('default_extend_by_min'),
-    stagger_min: 0, show_highest_bid: true, auto_award: false, status: 'draft',
+    stagger_min: 0, show_highest_bid: true, auto_award: false, status: 'draft', visibility: 'public', group_ids: [],
   };
 }
 
@@ -89,9 +106,27 @@ async function renderAuctionForm(res, { auction, values, errors = {} }) {
     title: auction ? `Edit ${auction.title}` : 'New auction',
     auction, v: values, errors, locked, categories,
     sellers: await sellersFor(values.seller_id),
+    groups: await allGroups(),
+    photos: auction ? await M.auctionPhotos(auction.id) : [],
+    MAX_PHOTOS: M.MAX_PHOTOS,
     ...M.EDITOR_ASSETS,
   });
 }
+
+const groupIdsOf = async (auctionId) => (await db.many('SELECT group_id FROM auction_groups WHERE auction_id = $1', [auctionId])).map((r) => r.group_id);
+
+/** Replace an auction's groups (restricted auctions only keep them; a public auction keeps none). */
+async function saveAuctionGroups(c, auctionId, visibility, groupIds) {
+  await c.query('DELETE FROM auction_groups WHERE auction_id = $1', [auctionId]);
+  if (visibility !== 'restricted' || !groupIds.length) return;
+  await c.query('INSERT INTO auction_groups(auction_id, group_id) SELECT $1, unnest($2::int[]) ON CONFLICT DO NOTHING', [auctionId, groupIds]);
+}
+
+/** Bidders (not blocked) who can see a restricted auction: members of its groups plus invited bidders. */
+const restrictedAudienceCount = async (auctionId) => (await db.one(
+  `SELECT count(*)::int AS n FROM users u WHERE NOT u.blocked AND (
+     EXISTS (SELECT 1 FROM auction_groups ag WHERE ag.auction_id = $1 AND ag.group_id = u.group_id)
+     OR EXISTS (SELECT 1 FROM auction_invites ai WHERE ai.auction_id = $1 AND ai.user_id = u.id))`, [auctionId])).n;
 
 /** Validate the auction form. Returns { values, errors }. */
 async function readAuctionForm(body, auction) {
@@ -111,8 +146,14 @@ async function readAuctionForm(body, auction) {
     show_highest_bid: body.show_highest_bid === '1',
     auto_award: body.auto_award === '1',
     status: ['draft', 'published', 'cancelled'].includes(body.status) ? body.status : 'draft',
-    remove_cover: body.remove_cover === '1',
+    visibility: VIS.includes(body.visibility) ? body.visibility : 'public',
+    group_ids: idList(body.group_ids),
   };
+  if (v.group_ids.length) {
+    const known = (await db.many('SELECT id FROM bidder_groups WHERE id = ANY($1::int[])', [v.group_ids])).map((r) => r.id);
+    if (known.length !== v.group_ids.length) e.group_ids = 'One of the ticked groups no longer exists. Check the list and save again.';
+    v.group_ids = known;
+  }
   if (!v.title) e.title = 'Enter a title, for example "HMS 1 and 2 scrap, Pune plant".';
   if (v.seller_id && !(await db.one('SELECT id FROM sellers WHERE id = $1', [v.seller_id]))) e.seller_id = 'Choose a seller from the list.';
   if (locked) {
@@ -135,15 +176,24 @@ async function readAuctionForm(body, auction) {
   return { values: v, errors: e };
 }
 
-/** Check the chosen cover photo (not yet stored). Sets errors.cover. */
-function checkCover(req, errors) {
-  if (M.rejectedNames(req, 'cover').length || (req.file && !isImage(req.file))) {
-    errors.cover = 'The cover must be a JPG, PNG or WebP photo. PDFs and other files cannot be used; add them under Documents on the auction page.';
+/** Check the photos chosen on the auction form against type and the per-auction limit. Sets errors.images. */
+function checkAuctionPhotos(req, existing, errors) {
+  const files = req.files || [];
+  const msg = M.checkPhotos(req, 'images', files);
+  if (msg) { errors.images = msg; return; }
+  if (existing + files.length > M.MAX_PHOTOS) {
+    const room = Math.max(0, M.MAX_PHOTOS - existing);
+    errors.images = existing
+      ? `An auction can have at most ${M.MAX_PHOTOS} photos. This one has ${existing}, so you can add ${room ? room + ' more' : 'no more: remove one first'}. You chose ${files.length}.`
+      : `An auction can have at most ${M.MAX_PHOTOS} photos. You chose ${files.length}.`;
   }
 }
 
 const AUCTION_COLS = ['title', 'seller_id', 'category', 'location', 'description', 'inspection', 'terms', 'starts_at', 'ends_at',
-  'extend_window_min', 'extend_by_min', 'stagger_min', 'show_highest_bid', 'auto_award', 'status'];
+  'extend_window_min', 'extend_by_min', 'stagger_min', 'show_highest_bid', 'auto_award', 'status', 'visibility'];
+
+/** Sentence for the flash after saving a restricted auction that nobody can see yet. */
+const NOBODY = ' Warning: it is restricted but has no groups and no invited bidders, so no bidder can see it yet. Tick a group on the edit page or invite bidders below.';
 
 router.get('/auctions/new', wrap(async (req, res) => {
   const v = auctionDefaults();
@@ -151,58 +201,105 @@ router.get('/auctions/new', wrap(async (req, res) => {
   await renderAuctionForm(res, { auction: null, values: v });
 }));
 
-router.post('/auctions', M.uploads(upload.single('cover')), wrap(async (req, res) => {
+router.post('/auctions', M.uploads(upload.array('images', M.MAX_PHOTOS)), wrap(async (req, res) => {
   if (req.uploadError) { req.flash('error', `${req.uploadError} The auction was not saved.`); return res.redirect('/admin/auctions/new'); }
   const { values: v, errors } = await readAuctionForm(req.body, null);
-  checkCover(req, errors);
-  if (!Object.keys(errors).length && req.file) {
-    const r = await M.storeImage(req.file);
-    if (r.error) errors.cover = r.error; else v.cover_id = r.id;
+  checkAuctionPhotos(req, 0, errors);
+  let fileIds = [];
+  if (!Object.keys(errors).length && req.files && req.files.length) {
+    const r = await M.storeImages(req.files);
+    if (r.error) errors.images = r.error; else fileIds = r.ids;
   }
   if (Object.keys(errors).length) return renderAuctionForm(res, { auction: null, values: v, errors });
   let note = '';
   if (v.status === 'published') { v.status = 'draft'; note = ' It is saved as a draft: add lots, then publish it.'; }
-  const cols = [...AUCTION_COLS, 'cover_id'];
-  const row = await db.one(
-    `INSERT INTO auctions(${cols.join(',')}) VALUES(${cols.map((_, i) => '$' + (i + 1)).join(',')}) RETURNING id`,
-    cols.map((k) => (v[k] === undefined ? null : v[k]))
-  );
-  audit(req, 'auction.create', `#${row.id} ${v.title}`);
-  req.flash('ok', `Auction created.${note || ' Add the lots next.'}`);
-  res.redirect(`/admin/auctions/${row.id}`);
+  const id = await db.tx(async (c) => {
+    const row = (await c.query(
+      `INSERT INTO auctions(${AUCTION_COLS.join(',')}) VALUES(${AUCTION_COLS.map((_, i) => '$' + (i + 1)).join(',')}) RETURNING id`,
+      AUCTION_COLS.map((k) => (v[k] === undefined ? null : v[k]))
+    )).rows[0];
+    await saveAuctionGroups(c, row.id, v.visibility, v.group_ids);
+    return row.id;
+  });
+  await M.appendPhotos('auction', id, fileIds);
+  audit(req, 'auction.create', `#${id} ${v.title}${v.visibility === 'restricted' ? `, restricted to group(s) ${v.group_ids.join(', ') || 'none'}` : ''}${fileIds.length ? `, ${fileIds.length} photo(s)` : ''}`);
+  const nobody = v.visibility === 'restricted' && !v.group_ids.length;
+  req.flash(nobody ? 'info' : 'ok', `Auction created.${note || ' Add the lots next.'}${nobody ? NOBODY : ''}`);
+  res.redirect(req.body.preview === '1' ? `/auctions/${id}` : `/admin/auctions/${id}`);
 }));
 
 router.get('/auctions/:id(\\d+)/edit', wrap(async (req, res) => {
   const a = await loadAuction(req.params.id);
   if (!a) return notFound(res, 'This auction');
-  await renderAuctionForm(res, { auction: a, values: a });
+  await renderAuctionForm(res, { auction: a, values: { ...a, group_ids: await groupIdsOf(a.id) } });
 }));
 
-router.post('/auctions/:id(\\d+)', M.uploads(upload.single('cover')), wrap(async (req, res) => {
+router.post('/auctions/:id(\\d+)', M.uploads(upload.array('images', M.MAX_PHOTOS)), wrap(async (req, res) => {
   const a = await loadAuction(req.params.id);
   if (!a) return notFound(res, 'This auction');
   if (req.uploadError) { req.flash('error', `${req.uploadError} The auction was not saved.`); return res.redirect(`/admin/auctions/${a.id}/edit`); }
   const { values: v, errors } = await readAuctionForm(req.body, a);
   if (v.status === 'published' && a.lot_count === 0) errors.status = 'Add at least one lot before publishing.';
-  checkCover(req, errors);
-  let coverId = v.remove_cover ? null : a.cover_id;
-  if (!Object.keys(errors).length && req.file) {
-    const r = await M.storeImage(req.file);
-    if (r.error) errors.cover = r.error; else coverId = r.id;
+  checkAuctionPhotos(req, a.photo_count, errors);
+  let fileIds = [];
+  if (!Object.keys(errors).length && req.files && req.files.length) {
+    const r = await M.storeImages(req.files);
+    if (r.error) errors.images = r.error; else fileIds = r.ids;
   }
   if (Object.keys(errors).length) return renderAuctionForm(res, { auction: a, values: { ...v, cover_id: a.cover_id }, errors });
-  await db.query(
-    `UPDATE auctions SET ${AUCTION_COLS.map((k, i) => `${k} = $${i + 2}`).join(', ')}, cover_id = $${AUCTION_COLS.length + 2},
-            reminder_sent = CASE WHEN starts_at <> $9 THEN false ELSE reminder_sent END
-      WHERE id = $1`,
-    [a.id, ...AUCTION_COLS.map((k) => v[k]), coverId]
-  );
-  if (a.cover_id && a.cover_id !== coverId) await M.deleteFilesIfUnused([a.cover_id]);
+  const oldGroups = await groupIdsOf(a.id);
+  await db.tx(async (c) => {
+    await c.query(
+      `UPDATE auctions SET ${AUCTION_COLS.map((k, i) => `${k} = $${i + 2}`).join(', ')},
+              reminder_sent = CASE WHEN starts_at <> $9 THEN false ELSE reminder_sent END,
+              watch_alert_sent = CASE WHEN starts_at <> $9 THEN false ELSE watch_alert_sent END
+        WHERE id = $1`,
+      [a.id, ...AUCTION_COLS.map((k) => v[k])]
+    );
+    await saveAuctionGroups(c, a.id, v.visibility, v.group_ids);
+  });
+  await M.appendPhotos('auction', a.id, fileIds);
   await bidding.recalcLotEnds(a.id);
-  const coverNote = coverId !== a.cover_id ? (coverId ? ' cover photo updated' : ' cover photo removed') : '';
-  audit(req, 'auction.update', `#${a.id} ${v.title}${v.status !== a.status ? ` (status ${a.status} to ${v.status})` : ''}${coverNote ? ',' + coverNote : ''}`);
-  req.flash('ok', `Auction saved.${coverNote ? ` The${coverNote.replace('photo ', 'photo was ')}.` : ''}`);
-  res.redirect(`/admin/auctions/${a.id}`);
+  const sameGroups = oldGroups.slice().sort().join(',') === (v.visibility === 'restricted' ? v.group_ids : []).slice().sort().join(',');
+  const changes = [];
+  if (v.status !== a.status) changes.push(`status ${a.status} to ${v.status}`);
+  if (v.visibility !== a.visibility) changes.push(`visibility ${a.visibility} to ${v.visibility}`);
+  if (!sameGroups) changes.push(`groups ${oldGroups.join(',') || 'none'} to ${(v.visibility === 'restricted' ? v.group_ids : []).join(',') || 'none'}`);
+  if (fileIds.length) changes.push(`${fileIds.length} photo(s) added`);
+  audit(req, 'auction.update', `#${a.id} ${v.title}${changes.length ? ': ' + changes.join(', ') : ''}`);
+  const nobody = v.visibility === 'restricted' && !v.group_ids.length && !a.invite_count;
+  const msg = `Auction saved.${fileIds.length ? ` ${plural(fileIds.length, 'photo')} added.` : ''}${v.visibility === 'public' && a.invite_count ? ' It is public now, so every bidder can see it; the invited bidders list is kept in case you restrict it again.' : ''}`;
+  req.flash(nobody ? 'info' : 'ok', msg + (nobody ? NOBODY : ''));
+  res.redirect(req.body.preview === '1' ? `/auctions/${a.id}` : fileIds.length && req.body.to_photos === '1' ? `/admin/auctions/${a.id}/edit#photos` : `/admin/auctions/${a.id}`);
+}));
+
+// Photo gallery actions from the auction edit page: op = cover | left | right | remove.
+router.post('/auctions/:id(\\d+)/photos/:photoId(\\d+)', wrap(async (req, res) => {
+  const a = await loadAuction(req.params.id);
+  if (!a) return notFound(res, 'This auction');
+  const to = `/admin/auctions/${a.id}/edit#photos`;
+  const photos = await M.auctionPhotos(a.id);
+  const idx = photos.findIndex((p) => p.id === toInt(req.params.photoId, 0));
+  if (idx < 0) { req.flash('error', 'That photo is no longer on this auction. The page has been reloaded.'); return res.redirect(to); }
+  const op = String(req.body.op || '');
+  const photo = photos[idx];
+  if (op === 'remove') {
+    await db.query('DELETE FROM auction_images WHERE id = $1', [photo.id]);
+    await M.syncAuctionCover(a.id);
+    await M.deleteFilesIfUnused([photo.file_id]);
+    audit(req, 'auction.photo_remove', `#${a.id} file #${photo.file_id}`);
+    req.flash('ok', `Photo removed. The auction now has ${plural(photos.length - 1, 'photo')}.`);
+    return res.redirect(to);
+  }
+  const order = M.reorderPhotos(photos, idx, op);
+  if (!order) { req.flash('error', 'Choose an action for the photo.'); return res.redirect(to); }
+  await db.tx(async (c) => {
+    for (let i = 0; i < order.length; i++) await c.query('UPDATE auction_images SET sort_order = $2 WHERE id = $1', [order[i].id, i]);
+    await M.syncAuctionCover(a.id, c);
+  });
+  audit(req, 'auction.photo_' + op, `#${a.id} file #${photo.file_id}`);
+  req.flash('ok', op === 'cover' ? 'Cover photo changed. It is shown on the auction list and at the top of the auction page.' : 'Photo order saved.');
+  res.redirect(to);
 }));
 
 // ---------- Workspace ----------
@@ -218,14 +315,76 @@ const docsOf = (auctionId) => db.many(
      FROM auction_documents d JOIN files f ON f.id = d.file_id WHERE d.auction_id = $1 ORDER BY d.id`, [auctionId]
 );
 
+/** Who can see the auction: its groups, invited bidders, totals and the announcement audience. */
+async function audienceOf(a, inviteQ) {
+  const [groups, invites, mailTo, total, previewGroups] = await Promise.all([
+    db.many(
+      `SELECT g.id, g.name, (SELECT count(*)::int FROM users u WHERE u.group_id = g.id AND NOT u.blocked) AS members
+         FROM auction_groups ag JOIN bidder_groups g ON g.id = ag.group_id WHERE ag.auction_id = $1 ORDER BY lower(g.name)`, [a.id]),
+    db.many(
+      `SELECT u.id, u.name, u.company_name, u.email, u.blocked, g.name AS group_name,
+              EXISTS (SELECT 1 FROM auction_groups ag WHERE ag.auction_id = $1 AND ag.group_id = u.group_id) AS via_group
+         FROM auction_invites ai JOIN users u ON u.id = ai.user_id LEFT JOIN bidder_groups g ON g.id = u.group_id
+        WHERE ai.auction_id = $1 ORDER BY lower(u.company_name), lower(u.name)`, [a.id]),
+    worker.audience(a.id),
+    a.visibility === 'restricted' ? restrictedAudienceCount(a.id) : db.one('SELECT count(*)::int AS n FROM users WHERE NOT blocked').then((r) => r.n),
+    db.many(
+      `SELECT DISTINCT g.id, g.name FROM bidder_groups g
+        WHERE EXISTS (SELECT 1 FROM lot_group_prices gp JOIN lots l ON l.id = gp.lot_id WHERE l.auction_id = $1 AND gp.group_id = g.id)
+           OR ($2 AND EXISTS (SELECT 1 FROM auction_groups ag WHERE ag.auction_id = $1 AND ag.group_id = g.id))
+        ORDER BY g.name`, [a.id, a.visibility === 'restricted']),
+  ]);
+  let results = null;
+  if (inviteQ) {
+    results = await db.many(
+      `SELECT u.id, u.name, u.company_name, u.email, u.city, u.blocked, g.name AS group_name,
+              EXISTS (SELECT 1 FROM auction_groups ag WHERE ag.auction_id = $1 AND ag.group_id = u.group_id) AS via_group
+         FROM users u LEFT JOIN bidder_groups g ON g.id = u.group_id
+        WHERE NOT EXISTS (SELECT 1 FROM auction_invites ai WHERE ai.auction_id = $1 AND ai.user_id = u.id)
+          AND (u.name ILIKE '%' || $2 || '%' OR u.company_name ILIKE '%' || $2 || '%' OR u.email ILIKE '%' || $2 || '%'
+               OR ('KA-' || lpad(u.id::text, 5, '0')) ILIKE '%' || $2 || '%')
+        ORDER BY lower(u.company_name), lower(u.name) LIMIT $3`, [a.id, inviteQ, SEARCH_LIMIT + 1]);
+  }
+  return { groups, invites, mailCount: mailTo.length, total, previewGroups, results, inviteQ };
+}
+
 router.get('/auctions/:id(\\d+)', wrap(async (req, res) => {
   const w = await workspace(req.params.id);
   if (!w) return notFound(res, 'This auction');
   res.adminPage('admin/auction', {
     title: w.a.title, ...w, nextLotNo: w.lots.length ? Math.max(...w.lots.map((l) => l.lot_no)) + 1 : 1,
-    docs: await docsOf(w.a.id), MAX_DOCS,
+    docs: await docsOf(w.a.id), MAX_DOCS, aud: await audienceOf(w.a, clean(req.query.invite_q, 100)), SEARCH_LIMIT,
     scripts: ['/js/admin.js'],
   });
+}));
+
+// ---------- Invited bidders (restricted auctions) ----------
+router.post('/auctions/:id(\\d+)/invites', wrap(async (req, res) => {
+  const a = await loadAuction(req.params.id);
+  if (!a) return notFound(res, 'This auction');
+  const to = `/admin/auctions/${a.id}#audience`;
+  const list = idList(req.body.user_ids);
+  if (!list.length) { req.flash('error', 'Tick at least one bidder to invite.'); return res.redirect(back(req, to)); }
+  const added = await db.many(
+    `INSERT INTO auction_invites(auction_id, user_id) SELECT $1, u.id FROM users u WHERE u.id = ANY($2::int[])
+     ON CONFLICT DO NOTHING RETURNING user_id`, [a.id, list]);
+  audit(req, 'auction.invite', `#${a.id}: ${added.map((r) => bidderNo(r.user_id)).join(', ') || 'none new'}`);
+  req.flash('ok', added.length
+    ? `${plural(added.length, 'bidder')} invited.${a.visibility !== 'restricted' ? ' The auction is public, so invitations only matter if you make it restricted.' : ' They can now see this auction and bid when it is live.'}`
+    : 'Those bidders were already invited.');
+  res.redirect(to);
+}));
+
+router.post('/auctions/:id(\\d+)/invites/:userId(\\d+)/delete', wrap(async (req, res) => {
+  const r = await db.one(
+    `DELETE FROM auction_invites ai USING users u WHERE ai.auction_id = $1 AND ai.user_id = $2 AND u.id = ai.user_id RETURNING u.id, u.name`,
+    [req.params.id, req.params.userId]);
+  if (!r) req.flash('info', 'That bidder was not invited to this auction.');
+  else {
+    audit(req, 'auction.uninvite', `#${req.params.id}: ${bidderNo(r.id)} ${r.name}`);
+    req.flash('ok', `${r.name} is no longer invited. They can still see the auction if they are in one of its groups. Bids already placed stand.`);
+  }
+  res.redirect(`/admin/auctions/${req.params.id}#audience`);
 }));
 
 // ---------- Documents ----------
@@ -330,6 +489,10 @@ router.post('/auctions/:id(\\d+)/duplicate', wrap(async (req, res) => {
               extend_window_min, extend_by_min, stagger_min, show_highest_bid, auto_award
          FROM auctions WHERE id = $1 RETURNING id, ends_at`, [a.id]
     )).rows[0];
+    // Who can see it and the group start prices are copied too.
+    await c.query('UPDATE auctions SET visibility = $2 WHERE id = $1', [copy.id, a.visibility]);
+    await c.query('INSERT INTO auction_groups(auction_id, group_id) SELECT $2, group_id FROM auction_groups WHERE auction_id = $1', [a.id, copy.id]);
+    await c.query('INSERT INTO auction_invites(auction_id, user_id) SELECT $2, user_id FROM auction_invites WHERE auction_id = $1', [a.id, copy.id]);
     // Photos, the cover and documents belong to one auction each (removing one must not break the
     // other), so they are not copied by reference. Text, prices and specifications are.
     await c.query(
@@ -337,16 +500,22 @@ router.post('/auctions/:id(\\d+)/duplicate', wrap(async (req, res) => {
        SELECT $2, lot_no, title, description, quantity, unit, start_price, increment, reserve_price, specs, $3
          FROM lots WHERE auction_id = $1`, [a.id, copy.id, copy.ends_at]
     );
+    await c.query(
+      `INSERT INTO lot_group_prices(lot_id, group_id, start_price)
+       SELECT nl.id, gp.group_id, gp.start_price FROM lot_group_prices gp
+         JOIN lots ol ON ol.id = gp.lot_id AND ol.auction_id = $1
+         JOIN lots nl ON nl.auction_id = $2 AND nl.lot_no = ol.lot_no`, [a.id, copy.id]);
     return copy.id;
   });
   await bidding.recalcLotEnds(newId);
   const { media } = await db.one(
     `SELECT ((SELECT cover_id FROM auctions WHERE id = $1) IS NOT NULL
+             OR EXISTS (SELECT 1 FROM auction_images WHERE auction_id = $1)
              OR EXISTS (SELECT 1 FROM lot_images li JOIN lots l ON l.id = li.lot_id WHERE l.auction_id = $1)
              OR EXISTS (SELECT 1 FROM auction_documents WHERE auction_id = $1)) AS media`, [a.id]);
   audit(req, 'auction.duplicate', `#${a.id} to #${newId}`);
-  req.flash('ok', `Copy created as a draft, dated 7 days later, with the same lots, descriptions and specifications. ${media
-    ? 'The cover photo, lot photos and documents were not copied: upload them again on this copy.'
+  req.flash('ok', `Copy created as a draft, dated 7 days later, with the same lots, descriptions, specifications, group start prices${a.visibility === 'restricted' ? ', groups and invited bidders' : ''}. ${media
+    ? 'The auction photos, lot photos and documents were not copied: upload them again on this copy.'
     : 'Photos and documents are never copied; add them on this copy if needed.'} Check the dates and lots, then publish.`);
   res.redirect(`/admin/auctions/${newId}`);
 }));
@@ -360,12 +529,13 @@ router.post('/auctions/:id(\\d+)/delete', wrap(async (req, res) => {
   }
   const files = (await db.many(
     `SELECT cover_id AS id FROM auctions WHERE id = $1 AND cover_id IS NOT NULL
+     UNION SELECT file_id FROM auction_images WHERE auction_id = $1
      UNION SELECT li.file_id FROM lot_images li JOIN lots l ON l.id = li.lot_id WHERE l.auction_id = $1
      UNION SELECT l.image_id FROM lots l WHERE l.auction_id = $1 AND l.image_id IS NOT NULL
      UNION SELECT file_id FROM auction_documents WHERE auction_id = $1`, [a.id]
   )).map((r) => r.id);
   await db.query('DELETE FROM auctions WHERE id = $1', [a.id]);
-  // Lot photos and documents rows went with the auction (ON DELETE CASCADE); now drop their files.
+  // Auction photos, lot photos and documents rows went with the auction (ON DELETE CASCADE); now drop their files.
   await M.deleteFilesIfUnused(files);
   audit(req, 'auction.delete', `#${a.id} ${a.title}${files.length ? `, ${files.length} file(s)` : ''}`);
   req.flash('ok', `Auction "${a.title}" and its lots were deleted.`);
@@ -382,7 +552,9 @@ router.post('/auctions/:id(\\d+)/announce', wrap(async (req, res) => {
   const n = await worker.mailAuction('auction_announcement', a.id);
   await db.query('UPDATE auctions SET announced_at = now() WHERE id = $1', [a.id]);
   audit(req, 'auction.announce', `#${a.id} ${a.title}: ${n} recipients`);
-  req.flash('ok', n ? `Announcement queued for ${n} bidder${n === 1 ? '' : 's'}.` : 'No bidders to email yet: nobody has a verified email address with announcements turned on.');
+  req.flash(n ? 'ok' : 'info', n ? `Announcement queued for ${n} bidder${n === 1 ? '' : 's'}${a.visibility === 'restricted' ? ' who can see this restricted auction' : ''}.`
+    : a.visibility === 'restricted' ? 'Nobody was emailed: no bidder who can see this restricted auction has a verified email address with announcements turned on.'
+      : 'No bidders to email yet: nobody has a verified email address with announcements turned on.');
   res.redirect(`/admin/auctions/${a.id}`);
 }));
 
@@ -429,12 +601,47 @@ router.post('/lots/:id(\\d+)/close-now', wrap(async (req, res) => {
 async function renderLotForm(res, { auction, lot, values, errors = {} }) {
   const photos = lot ? await M.lotPhotos(lot.id) : [];
   const specRows = values.specRows || (Array.isArray(values.specs) ? values.specs : []);
+  const groups = await allGroups();
+  // Raw text per group id: what the admin typed (after an error) or the stored price.
+  let gp = values.groupPrices;
+  if (!gp) {
+    gp = {};
+    if (lot) for (const r of await db.many('SELECT group_id, start_price FROM lot_group_prices WHERE lot_id = $1', [lot.id])) gp[r.group_id] = String(r.start_price);
+  }
+  const auctionGroups = auction.visibility === 'restricted' ? await groupIdsOf(auction.id) : [];
   res.adminPage('admin/lot_form', {
-    title: lot ? `Edit lot ${lot.lot_no}` : 'Add lot', auction, lot, v: values, errors, UNITS,
+    title: lot ? `Edit lot ${lot.lot_no}` : 'Add lot', auction, lot, v: values, errors, UNITS, groups, gp, auctionGroups,
     pricesLocked: !!lot && lot.bid_count > 0,
     photos, specRows, SPEC_LABELS: M.SPEC_LABELS, MAX_PHOTOS: M.MAX_PHOTOS, SPEC_ROWS: M.SPEC_ROWS,
     SPEC_LABEL_MAX: M.SPEC_LABEL_MAX, SPEC_VALUE_MAX: M.SPEC_VALUE_MAX,
     ...M.EDITOR_ASSETS,
+  });
+}
+
+/**
+ * Group start prices from the lot form (fields gp_<groupId>). Blank means "use the lot's start price".
+ * Returns { raw: {groupId: text}, prices: [{group_id, start_price}] } and sets errors.group_prices.
+ */
+function readGroupPrices(body, groups, e) {
+  const raw = {};
+  const prices = [];
+  const bad = [];
+  for (const g of groups) {
+    const t = clean(body['gp_' + g.id], 20);
+    if (!t) continue;
+    raw[g.id] = t;
+    const n = toMoney(t);
+    if (!(n > 0)) { bad.push(g.name); e['gp_' + g.id] = 'Enter a price above 0, or leave it empty.'; } else prices.push({ group_id: g.id, start_price: n });
+  }
+  if (bad.length) e.group_prices = `Check the start price for ${bad.join(', ')}: enter rupees above 0, for example 41000, or leave the box empty to use the lot's opening price.`;
+  return { raw, prices };
+}
+
+/** Replace a lot's group start prices. */
+async function saveGroupPrices(lotId, prices) {
+  await db.tx(async (c) => {
+    await c.query('DELETE FROM lot_group_prices WHERE lot_id = $1', [lotId]);
+    for (const p of prices) await c.query('INSERT INTO lot_group_prices(lot_id, group_id, start_price) VALUES($1,$2,$3)', [lotId, p.group_id, p.start_price]);
   });
 }
 
@@ -519,6 +726,8 @@ router.post('/auctions/:id(\\d+)/lots', M.uploads(upload.array('images', M.MAX_P
     return res.redirect(`/admin/auctions/${a.id}`);
   }
   const { values: v, errors } = readLotForm(req.body, null);
+  const gp = readGroupPrices(req.body, await allGroups(), errors);
+  v.groupPrices = gp.raw;
   if (!errors.lot_no && await db.one('SELECT 1 FROM lots WHERE auction_id = $1 AND lot_no = $2', [a.id, v.lot_no])) {
     errors.lot_no = `Lot ${v.lot_no} already exists in this auction. Use another number.`;
   }
@@ -535,6 +744,7 @@ router.post('/auctions/:id(\\d+)/lots', M.uploads(upload.array('images', M.MAX_P
     [a.id, v.lot_no, v.title, v.description, v.quantity, v.unit, v.start_price, v.increment, v.reserve_price, JSON.stringify(v.specs), a.ends_at]
   );
   await addLotPhotos(lot.id, fileIds);
+  await saveGroupPrices(lot.id, gp.prices);
   if (a.started) {
     // recalcLotEnds only runs before the start, so place a late lot in the stagger sequence here.
     await db.query(
@@ -545,9 +755,9 @@ router.post('/auctions/:id(\\d+)/lots', M.uploads(upload.array('images', M.MAX_P
   } else {
     await bidding.recalcLotEnds(a.id);
   }
-  audit(req, 'lot.create', `auction #${a.id} lot ${v.lot_no} ${v.title}${fileIds.length ? `, ${photoWord(fileIds.length)}` : ''}`);
-  req.flash('ok', `Lot ${v.lot_no} added${fileIds.length ? ` with ${photoWord(fileIds.length)}` : ''}.`);
-  res.redirect(req.body.and_next === '1' ? `/admin/auctions/${a.id}/lots/new` : `/admin/auctions/${a.id}`);
+  audit(req, 'lot.create', `auction #${a.id} lot ${v.lot_no} ${v.title}${fileIds.length ? `, ${photoWord(fileIds.length)}` : ''}${gp.prices.length ? `, ${gp.prices.length} group price(s)` : ''}`);
+  req.flash('ok', `Lot ${v.lot_no} added${fileIds.length ? ` with ${photoWord(fileIds.length)}` : ''}${gp.prices.length ? `${fileIds.length ? ' and' : ' with'} ${plural(gp.prices.length, 'group start price')}` : ''}.`);
+  res.redirect(req.body.preview === '1' ? `/auctions/${a.id}/lots/${lot.id}` : req.body.and_next === '1' ? `/admin/auctions/${a.id}/lots/new` : `/admin/auctions/${a.id}`);
 }));
 
 router.get('/lots/:id(\\d+)/edit', wrap(async (req, res) => {
@@ -563,6 +773,9 @@ router.post('/lots/:id(\\d+)', M.uploads(upload.array('images', M.MAX_PHOTOS)), 
   if (req.uploadError) { req.flash('error', `${req.uploadError} The lot was not saved.`); return res.redirect(`/admin/lots/${lot.id}/edit`); }
   const a = await loadAuction(lot.auction_id);
   const { values: v, errors } = readLotForm(req.body, lot);
+  // Like the opening price, group start prices are fixed once the lot has bids.
+  const gp = lot.bid_count > 0 ? { raw: null, prices: null } : readGroupPrices(req.body, await allGroups(), errors);
+  if (gp.raw) v.groupPrices = gp.raw;
   if (!errors.lot_no && v.lot_no !== lot.lot_no && await db.one('SELECT 1 FROM lots WHERE auction_id = $1 AND lot_no = $2', [a.id, v.lot_no])) {
     errors.lot_no = `Lot ${v.lot_no} already exists in this auction. Use another number.`;
   }
@@ -579,11 +792,12 @@ router.post('/lots/:id(\\d+)', M.uploads(upload.array('images', M.MAX_PHOTOS)), 
     [lot.id, v.lot_no, v.title, v.description, v.quantity, v.unit, v.start_price, v.increment, v.reserve_price, JSON.stringify(v.specs)]
   );
   await addLotPhotos(lot.id, fileIds);
+  if (gp.prices) await saveGroupPrices(lot.id, gp.prices);
   await bidding.recalcLotEnds(a.id);
   bidding.broadcastLot(a.id, lot.id);
-  audit(req, 'lot.update', `lot #${lot.id} (auction #${a.id}, lot ${v.lot_no}) ${v.title}${fileIds.length ? `, added ${photoWord(fileIds.length)}` : ''}`);
+  audit(req, 'lot.update', `lot #${lot.id} (auction #${a.id}, lot ${v.lot_no}) ${v.title}${fileIds.length ? `, added ${photoWord(fileIds.length)}` : ''}${gp.prices ? `, ${gp.prices.length} group price(s)` : ''}`);
   req.flash('ok', `Lot ${v.lot_no} saved${fileIds.length ? `, ${photoWord(fileIds.length)} added` : ''}.`);
-  res.redirect(fileIds.length ? `/admin/lots/${lot.id}/edit#photos` : `/admin/auctions/${a.id}`);
+  res.redirect(req.body.preview === '1' ? `/auctions/${a.id}/lots/${lot.id}` : fileIds.length ? `/admin/lots/${lot.id}/edit#photos` : `/admin/auctions/${a.id}`);
 }));
 
 // Photo gallery actions from the lot edit page: op = cover | left | right | remove.
@@ -632,6 +846,37 @@ router.post('/lots/:id(\\d+)/delete', wrap(async (req, res) => {
   audit(req, 'lot.delete', `lot #${lot.id} (auction #${lot.auction_id}, lot ${lot.lot_no}) ${lot.title}`);
   req.flash('ok', `Lot ${lot.lot_no} deleted${files.length ? ` with its ${photoWord(lot.photo_count)}` : ''}.`);
   res.redirect(`/admin/auctions/${lot.auction_id}`);
+}));
+
+// Admin lot detail (rendered by results.js): add group start prices and active auto-bid maximums.
+// The extra section is rendered from admin/_lot_extra.ejs and placed before the bid history.
+router.get('/lots/:id(\\d+)', wrap(async (req, res, next) => {
+  const lotId = toInt(req.params.id, 0);
+  const [prices, proxies, lotRow] = await Promise.all([
+    db.many(
+      `SELECT g.id, g.name, gp.start_price FROM lot_group_prices gp JOIN bidder_groups g ON g.id = gp.group_id
+        WHERE gp.lot_id = $1 ORDER BY lower(g.name)`, [lotId]),
+    db.many(
+      `SELECT p.user_id, p.max_amount, p.created_at, p.updated_at, u.name, u.company_name, u.blocked
+         FROM proxy_bids p JOIN users u ON u.id = p.user_id WHERE p.lot_id = $1 AND p.active
+        ORDER BY p.max_amount DESC, p.updated_at ASC`, [lotId]),
+    db.one('SELECT l.start_price, l.auction_id FROM lots l WHERE l.id = $1', [lotId]),
+  ]);
+  if (!lotRow) return next();
+  const original = res.adminPage;
+  res.adminPage = (view, data = {}) => {
+    if (view !== 'admin/lot') return original(view, data);
+    res.render(view, data, (err, main) => {
+      if (err) return next(err);
+      res.render('admin/_lot_extra', { ...data, prices, proxies, lotId, lotStart: lotRow.start_price, auctionId: lotRow.auction_id }, (err2, extra) => {
+        if (err2) return next(err2);
+        const at = main.search(/<section class="admin-section">\s*<h2>All bids on this lot<\/h2>/);
+        const body = at >= 0 ? main.slice(0, at) + extra + main.slice(at) : main + extra;
+        res.render('admin/layout', { ...data, body });
+      });
+    });
+  };
+  next();
 }));
 
 // Lot photos and other stored files, for admin pages.

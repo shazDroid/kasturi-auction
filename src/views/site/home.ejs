@@ -43,7 +43,7 @@
           <% liveNow.forEach(function (a) { %>
             <a class="live-item" href="/auctions/<%= a.id %>">
               <span class="thumb"><% if (a.cover_id) { %><img src="/media/<%= a.cover_id %>?size=thumb" alt="" width="56" height="56" loading="lazy"><% } else { %><%- include('../partials/ph', { category: a.category, small: true, iconSize: 22 }) %><% } %></span>
-              <span><b><%= a.title %></b><span class="sub"><%= a.lot_count %> <%= a.lot_count === 1 ? 'lot' : 'lots' %><% if (a.location) { %>, <%= a.location.split(',').slice(-2).join(',').trim() %><% } %></span></span>
+              <span><b><%= a.title %></b><span class="sub"><%= a.lot_count %> <%= a.lot_count === 1 ? 'lot' : 'lots' %><% if (a.location) { %>, <%= a.location.split(',').slice(-2).join(',').trim() %><% } %><% if (a.visibility === 'restricted') { %> <span class="tag">Invitation only</span><% } %></span></span>
               <span class="when"><span>Closes in</span><b class="countdown" data-countdown="<%= a.closeAt %>" data-done="Closing"></b></span>
             </a>
           <% }) %>
@@ -51,7 +51,7 @@
         <% } else if (nextUp) { %>
           <div class="live-panel-head"><h2 id="live-h">Next auction</h2><a href="/auctions?show=upcoming">All upcoming</a></div>
           <div class="live-next">
-            <span class="tag tag-upcoming">Starts <%= nextUp.weekday %> <%= nextUp.dayNum %> <%= nextUp.month %>, <%= fmtTime(nextUp.starts_at) %></span>
+            <span class="tag tag-upcoming">Starts <%= nextUp.weekday %> <%= nextUp.dayNum %> <%= nextUp.month %>, <%= fmtTime(nextUp.starts_at) %></span><% if (nextUp.visibility === 'restricted') { %> <span class="tag">Invitation only</span><% } %>
             <h3><a href="/auctions/<%= nextUp.id %>"><%= nextUp.title %></a></h3>
             <ul class="meta">
               <% if (nextUp.seller_name) { %><li><%- I('factory', 17) %><span><%= nextUp.seller_name %></span></li><% } %>
@@ -193,7 +193,7 @@
         <% closed.forEach(function (a) { var d = new Date(a.closed_at || a.ends_at); %>
           <a class="ci" href="/auctions/<%= a.id %>">
             <span class="ci-date" aria-hidden="true"><b><%= fmtDate(d).split(' ')[0] %></b><span><%= fmtDate(d).split(' ')[1] %></span></span>
-            <span class="ci-title"><b><%= a.title %></b><span><%= a.seller_name || 'Seller not disclosed' %></span></span>
+            <span class="ci-title"><b><%= a.title %></b><span><%= a.seller_name || 'Seller not disclosed' %><% if (a.visibility === 'restricted') { %> <span class="tag">Invitation only</span><% } %></span></span>
             <span class="ci-cell"><%= a.category %></span>
             <span class="ci-cell tnum"><%= a.lot_count %> <%= a.lot_count === 1 ? 'lot' : 'lots' %></span>
             <span class="ci-go">View results<span class="sr">, closed <%= fmtDate(d) %></span></span>

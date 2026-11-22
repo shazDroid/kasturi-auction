@@ -1,0 +1,35 @@
+<div class="page-head">
+  <div>
+    <h1>New sign-up codes</h1>
+    <p><%= rows.length %> code<%= rows.length === 1 ? '' : 's' %> created <%= fmtDT(rows[0].created_at) %> IST<% var gn = rows.map(function (r) { return r.group_name || ''; }).filter(function (x, i, all) { return all.indexOf(x) === i; }); %><%= gn.length === 1 ? (gn[0] ? ', for the group ' + gn[0] : ', not linked to a group') : '' %>.</p>
+  </div>
+  <div class="row">
+    <a class="btn" href="/admin/codes/batch/<%= batch %>.csv">Download as CSV</a>
+    <a class="btn btn-quiet" href="/admin/codes">All codes</a>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-head"><h3><label for="all-codes">All codes, one per line</label></h3><button type="button" class="btn btn-quiet btn-sm" data-copy-from="all-codes" hidden>Copy all</button></div>
+  <div class="panel-body">
+    <textarea id="all-codes" class="ax-codes-box" rows="<%= Math.min(12, rows.length + 1) %>" readonly><%= rows.map(function (c) { return c.code; }).join('\n') %></textarea>
+    <p class="hint muted small">Each business registers at <span class="code"><%= codeUrl('') %>CODE</span>, or types the code on the registration form.</p>
+  </div>
+</div>
+
+<div class="table-wrap mt">
+  <table class="table table-stack">
+    <thead><tr><th>Code</th><th>Registration link</th><th class="num">Uses allowed</th><th>Expires</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (c) { %>
+      <tr>
+        <td data-label="Code" class="nowrap"><a class="code ax-code" href="/admin/codes/<%= c.id %>"><%= c.code %></a></td>
+        <td data-label="Registration link" class="ax-break"><span class="small"><%= codeUrl(c.code) %></span></td>
+        <td class="num" data-label="Uses allowed"><%= fmtNum(c.max_uses) %></td>
+        <td data-label="Expires" class="nowrap"><%= c.expires_at ? fmtDate(c.expires_at) : 'No expiry' %></td>
+        <td class="actions"><button type="button" class="linkbtn" data-copy="<%= c.code %>" hidden>Copy code</button><a href="/admin/codes/<%= c.id %>#email">Email this code</a></td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+</div>

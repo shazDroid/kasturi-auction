@@ -55,3 +55,27 @@ Already in place:
 - Quill 2 is served at `/vendor/quill/quill.js` and `/vendor/quill/quill.snow.css` (CSP allows only same-origin scripts, so never use a CDN).
 - Both layouts accept `styles: ['/css/x.css']` as well as `scripts: [...]`.
 - Rich text fields: `auctions.description`, `auctions.inspection`, `auctions.terms`, `lots.description`. They now hold sanitised editor HTML (older rows hold plain text).
+
+## Version 3 additions (groups, restricted auctions, sign-up codes, auto-bidding, watchlist, billing, Excel)
+Already in place and tested (do not change these files' behaviour; read them):
+- Schema: the two v3 blocks at the end of `src/schema.sql`: `bidder_groups` (fee_amount, commission_percent; NULL = use the default from Settings), `users.group_id`, `users.invite_code_id`, `invite_codes`, `auctions.visibility` ('public' | 'restricted'), `auction_groups`, `auction_invites`, `auction_images` (extra auction photos; `auctions.cover_id` must always equal the first auction_images row by sort_order, id, or NULL when there are none), `lot_group_prices`, `proxy_bids`, `bids.auto`, `lots.commission_percent` (frozen when a lot is awarded), `watchlist`, `sale_orders`, `invoices`, `invoice_payments`, `lots.buyer_paid_at / lifted_at / settlement_note`.
+- Settings (`src/lib/settings.js` DEFS; the admin Settings page renders them automatically): `require_invite_code`, `proxy_bidding_enabled`, `default_commission_percent`, `watch_alert_minutes`, and the "Billing and sale orders" group (`company_legal_name`, `company_gstin`, `company_state`, `sale_order_prefix`, `invoice_prefix`, `commission_gst_percent`, `invoice_sac`, `invoice_due_days`, `bank_details`, `sale_order_terms`).
+- `src/lib/bidding.js`:
+  - `visibleSql(n)`: SQL condition on auctions alias `a` for "bidder $n may see this auction" (bind 0 for visitors). EVERY public query that lists or loads auctions/lots must include it. `canSee(auctionId, userId)`.
+  - `auctionState()` now returns per lot: `startPrice` (the viewer's group price), `minBid`, `myBid`, `myMax` (the viewer's active auto-bid maximum or null), `leading`, `won`.
+  - `placeBid()` returns `{bidId, extended, leading}` (leading false = another bidder's auto-bid immediately beat it). `setProxy({userId, lotId, maxAmount})` -> `{extended, leading, max}`, `cancelProxy({userId, lotId})`. Both throw `BidError`.
+  - `startPriceFor(q, lot, groupId)`, `commissionFor(q, userId)`.
+- `src/lib/payments.js`: `feeQuoteFor(userId)` (async; includes the bidder's group fee and `groupName`); use it wherever a specific bidder's fee is shown. `feeQuote()` is the default fee only.
+- `src/lib/worker.js`: `audience(auctionId)` respects restricted auctions; watchers get template `watch_alert` before start.
+- `src/routes/media.js`: serves auction_images too and hides files of restricted auctions from bidders who cannot see them.
+- `src/routes/admin.js` mounts `src/routes/admin/{groups,codes,billing,reports,excel}.js` automatically when the file exists. The admin sidebar already links: /admin/excel, /admin/groups, /admin/codes, /admin/billing/sale-orders, /admin/billing/invoices, /admin/reports.
+- npm packages installed: `pdfkit`, `exceljs` (plus sharp, sanitize-html, quill).
+
+Interfaces being written in parallel (code against these exactly):
+`src/lib/billing.js`
+- `invoiceForFeePayment(paymentId)`: idempotent; raises a paid tax invoice for a paid registration fee (called automatically by payments.js).
+- `issueSaleOrder(lotId, adminId) -> saleOrder row` (lot must be awarded; idempotent per lot), `issueCommissionInvoice(lotId, adminId) -> invoice row | null` (null when the commission is 0).
+- `saleOrderPdf(saleOrderId) -> Promise<Buffer>`, `invoicePdf(invoiceId) -> Promise<Buffer>`.
+- `listForUser(userId) -> Promise<{ saleOrders: [...], invoices: [...] }>` (rows include id, number, issued_at, totals, status, lot/auction titles).
+New email templates (in mailer DEFAULT_TEMPLATES): `watch_alert(name, auction_title, location, starts_at, ends_at, minutes, auction_url)`, `invite_code(name, company, code, register_url, expires_on, group_name)`, `sale_order_issued(name, number, auction_title, lot_no, lot_title, amount, billing_url)`, `invoice_issued(name, number, description, total, due_on, billing_url)`.
+Bidder URLs: `/account/billing` (sale orders and invoices with PDF downloads at `/account/billing/sale-orders/:id.pdf` and `/account/billing/invoices/:id.pdf`), `/account/watchlist`, `POST /auctions/:id/watch` and `/unwatch`, `POST /lots/:id/autobid` (JSON {max}) and `/autobid/cancel`. Registration accepts an `invite_code` field. Admins can open unpublished auctions on the public URLs as a preview (`/auctions/:id`, `/auctions/:auctionId/lots/:lotId`).

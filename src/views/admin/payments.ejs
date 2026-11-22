@@ -10,6 +10,10 @@
   <div class="notice notice-warn"><p>Online payment is off: Razorpay is not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET on the server, and RAZORPAY_WEBHOOK_SECRET for payment confirmations. Until then, record fees from the bidder's page.</p></div>
 <% } %>
 
+<% if (missingInvoices > 0) { %>
+  <div class="notice"><p><%= missingInvoices %> paid fee<%= missingInvoices === 1 ? ' has' : 's have' %> no tax invoice yet. <a href="/admin/billing/invoices">Raise them from the Invoices page</a>.</p></div>
+<% } %>
+
 <form class="filters" method="get" action="/admin/payments">
   <label class="sr" for="f-q">Search</label>
   <input type="search" id="f-q" name="q" value="<%= f.q %>" placeholder="Bidder, company, Razorpay id or note">
@@ -37,7 +41,7 @@
   <div class="empty"><h3>No payments<%= (f.q || f.status || f.method || f.from || f.to) ? ' match these filters' : ' yet' %></h3><p>Fees appear here when a bidder pays online or when you record an offline payment on a bidder's page.</p></div>
 <% } else { %>
   <table class="table table-stack">
-    <thead><tr><th>Date</th><th>Bidder</th><th>Purpose</th><th class="num">Base</th><th class="num">GST</th><th class="num">Total</th><th>Method</th><th>Status</th><th>Razorpay ids</th><th>Note</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>Bidder</th><th>Purpose</th><th class="num">Base</th><th class="num">GST</th><th class="num">Total</th><th>Method</th><th>Status</th><th>Invoice</th><th>Razorpay ids</th><th>Note</th><th></th></tr></thead>
     <tbody>
     <% rows.forEach(function (p) { %>
       <tr>
@@ -49,6 +53,7 @@
         <td class="num" data-label="Total"><b><%= fmtINR(p.amount) %></b></td>
         <td data-label="Method"><%= p.method === 'offline' ? 'Offline' : 'Razorpay' %></td>
         <td data-label="Status"><%- tag('payment', p.status) %></td>
+        <td data-label="Invoice" class="nowrap"><% if (p.inv_id) { %><a href="/admin/billing/invoices/<%= p.inv_id %>"><%= p.inv_number %></a><% } else if (p.status === 'paid') { %><span class="muted">None</span><% } %></td>
         <td data-label="Razorpay ids"><% if (p.rp_order_id) { %><span class="code"><%= p.rp_order_id %></span><% } %><% if (p.rp_payment_id) { %><span class="sub"><span class="code"><%= p.rp_payment_id %></span></span><% } %></td>
         <td data-label="Note" class="note-cell"><%= p.note %></td>
         <td class="actions"><% if (p.status === 'paid') { %><a href="/admin/payments/<%= p.id %>/refund">Mark refunded</a><% } %></td>
@@ -61,7 +66,7 @@
         <td class="num"><%= fmtINR(totals.base) || '₹0' %></td>
         <td class="num"><%= fmtINR(totals.tax) || '₹0' %></td>
         <td class="num"><%= fmtINR(totals.amount) || '₹0' %></td>
-        <td colspan="5"></td>
+        <td colspan="6"></td>
       </tr>
     </tfoot>
   </table>

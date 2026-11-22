@@ -95,7 +95,7 @@
             <tr class="<%= b.cancelled ? 'void' : '' %>">
               <td data-label="Time" class="nowrap"><%= fmtDTs(b.created_at) %></td>
               <td class="cell-main"><a href="/admin/lots/<%= b.lot_id %>">Lot <%= b.lot_no %>: <%= b.lot_title %></a><span class="sub"><a href="/admin/auctions/<%= b.auction_id %>"><%= b.auction_title %></a></span></td>
-              <td class="num amt" data-label="Amount"><%= fmtINR(b.amount) %></td>
+              <td class="num amt" data-label="Amount"><%= fmtINR(b.amount) %><% if (b.auto) { %><span class="sub">Auto-bid</span><% } %></td>
               <td data-label="Outcome">
                 <% if (b.cancelled) { %><span class="tag tag-bad">Cancelled</span>
                 <% } else if (b.lot_status === 'open') { %><span class="tag tag-live">Lot open</span>
@@ -150,6 +150,27 @@
       </div>
     </div>
 
+    <div class="panel" id="group">
+      <div class="panel-head"><h3>Group and terms</h3></div>
+      <div class="panel-body">
+        <dl class="kv">
+          <dt>Group</dt><dd><% if (group) { %><a href="/admin/groups/<%= group.id %>"><%= group.name %></a><% } else { %>None<% } %></dd>
+          <dt>Registration fee</dt><dd><%= fmtINR(quote.base) %> + <%= fmtNum(quote.gstPercent) %>% GST = <%= fmtINR(quote.total) %><span class="sub muted small"><%= group && group.fee_amount !== null ? 'Set by the group' : 'Default from Settings' %></span></dd>
+          <dt>Buyer's commission</dt><dd><%= fmtNum(commission) %>%<span class="sub muted small"><%= group && group.commission_percent !== null ? 'Set by the group' : 'Default from Settings' %></span></dd>
+          <dt>Sign-up code</dt><dd><% if (code) { %><a class="code" href="/admin/codes/<%= code.id %>"><%= code.code %></a><% if (code.label) { %><span class="sub muted small"><%= code.label %></span><% } %><% } else { %>None<% } %></dd>
+        </dl>
+        <form method="post" action="/admin/bidders/<%= u.id %>/group" class="ax-inline-field mt">
+          <%- include('_csrf') %>
+          <label for="group_id">Change group</label>
+          <select id="group_id" name="group_id">
+            <option value="">No group</option>
+            <% groups.forEach(function (g) { %><option value="<%= g.id %>" <%= u.group_id === g.id ? 'selected' : '' %>><%= g.name %></option><% }) %>
+          </select>
+          <button class="btn btn-quiet btn-sm" type="submit">Save group</button>
+        </form>
+      </div>
+    </div>
+
     <div class="panel">
       <div class="panel-head"><h3>Registration fee</h3><%- feeActive ? tag('yesno', true, 'Valid') : tag('yesno', false, u.fee_paid_until ? 'Expired' : 'Not paid') %></div>
       <div class="panel-body">
@@ -159,7 +180,7 @@
           <div class="field">
             <label for="fee-note">Record a payment received offline</label>
             <input type="text" id="fee-note" name="note" maxlength="500" required placeholder="NEFT UTR, cheque number or receipt">
-            <div class="hint">Records <%= fmtINR(quote.total) %> (<%= fmtINR(quote.base) %> + <%= quote.gstPercent %>% GST) and extends validity by <%= quote.validityDays > 0 ? quote.validityDays + ' days' : 'no expiry' %>. A receipt is emailed.</div>
+            <div class="hint">Records <%= fmtINR(quote.total) %> (<%= fmtINR(quote.base) %> + <%= quote.gstPercent %>% GST) and extends validity by <%= quote.validityDays > 0 ? quote.validityDays + ' days' : 'no expiry' %><%= quote.groupName ? ', the fee of the group ' + quote.groupName : '' %>. A receipt is emailed.</div>
           </div>
           <button class="btn btn-sm" type="submit" data-confirm="Record an offline fee payment of <%= fmtINR(quote.total) %> for <%= u.name %>?">Record offline payment</button>
         </form>

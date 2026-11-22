@@ -1,0 +1,117 @@
+/* Billing, reports and Excel import/export (admin). Loaded after app.css and admin-extra.css.
+   Uses the tokens from app.css; does not restyle shared classes. Every class here is prefixed bl-. */
+
+/* ---------- Lists ---------- */
+.bl-tags { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.bl-bulk { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 14px; margin-bottom: 14px; }
+.bl-notice-row { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; }
+.bl-notice-row p { margin: 0; flex: 1 1 320px; }
+
+td.bl-party { min-width: 170px; max-width: 30ch; overflow-wrap: anywhere; }
+td.bl-desc { min-width: 200px; max-width: 42ch; overflow-wrap: anywhere; }
+.filters select { max-width: 380px; }
+
+/* ---------- Document view (sale order, invoice) ---------- */
+.bl-doc .panel-body { padding: 24px 26px; }
+.bl-doc-head { display: flex; justify-content: space-between; gap: 16px 28px; flex-wrap: wrap; padding-bottom: 14px; border-bottom: 1px solid var(--ink); margin-bottom: 18px; }
+.bl-doc-head h2 { font-size: 20px; margin: 0 0 4px; overflow-wrap: anywhere; }
+.bl-doc-head > div { min-width: 0; flex: 1 1 260px; }
+.bl-doc-head p { margin: 0; max-width: 52ch; }
+.bl-facts { display: grid; grid-template-columns: max-content max-content; gap: 3px 16px; margin: 0; font-size: 14px; align-content: start; }
+.bl-facts dt { color: var(--steel); }
+.bl-facts dd { margin: 0; font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+.bl-parties { gap: 20px 28px; margin-bottom: 18px; }
+.bl-parties h3, .bl-h { font: 600 13px/1.3 var(--body); color: var(--steel); margin: 0 0 6px; }
+.bl-h { margin-top: 18px; }
+.bl-parties p { margin: 0 0 6px; overflow-wrap: anywhere; }
+.bl-kv { grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; font-size: 14px; }
+.bl-kv dd { font-weight: 400; }
+.bl-doc .panel-body > .table-wrap.flat { margin: 0 -26px 0; }
+.bl-lines td { overflow-wrap: anywhere; }
+.bl-totals { margin: 0 0 0 auto; border-collapse: collapse; min-width: min(380px, 100%); font-variant-numeric: tabular-nums; }
+.bl-totals th { text-align: left; font-weight: 400; color: var(--ink-2); padding: 7px 18px 7px 0; }
+.bl-totals td { text-align: right; padding: 7px 0; white-space: nowrap; }
+.bl-totals tr.is-strong th, .bl-totals tr.is-strong td { font-weight: 600; color: var(--ink); border-top: 1px solid var(--line); }
+.bl-pre { white-space: pre-line; overflow-wrap: anywhere; color: var(--ink-2); }
+
+/* ---------- Settlement ---------- */
+.bl-settle { display: grid; gap: 16px; }
+.bl-settle > div + div { border-top: 1px solid var(--line-soft); padding-top: 14px; }
+.bl-settle p { margin: 6px 0; }
+.bl-settle-form { display: grid; gap: 6px; margin-top: 8px; }
+.bl-settle-form label { margin: 4px 0 0; font-size: 13px; font-weight: 500; color: var(--steel); }
+.bl-settle-form .btn { justify-self: start; margin-top: 6px; }
+
+/* ---------- Manual invoice lines ---------- */
+.bl-lines-form td { padding-top: 6px; padding-bottom: 6px; vertical-align: middle; }
+.bl-lines-form td:first-child { width: 36px; color: var(--steel); }
+.bl-lines-form input { padding: 7px 10px; font-size: 14px; }
+.bl-lines-form .bl-num { max-width: 150px; margin-left: auto; text-align: right; }
+
+/* ---------- Reports ---------- */
+.bl-report-bar { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 18px; display: grid; gap: 12px; }
+.bl-report-bar .filters { margin: 0; }
+.bl-presets { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.bl-presets span { color: var(--steel); font-size: 14px; margin-right: 4px; }
+.bl-presets a { font-size: 13.5px; text-decoration: none; color: var(--ink-2); border: 1px solid var(--line); border-radius: 4px; padding: 4px 9px; background: var(--paper); }
+.bl-presets a:hover { border-color: var(--steel-3); background: var(--surface); }
+.bl-presets a[aria-current] { border-color: var(--ink); color: var(--ink); font-weight: 600; }
+.bl-report-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 16px; margin: 0 0 10px; }
+.bl-report-head h2 { font-size: 19px; margin: 0; }
+.bl-report-head p { margin: 0; color: var(--steel); font-size: 14px; }
+.bl-report-head .row { gap: 8px; }
+.bl-table td, .bl-table th { white-space: nowrap; }
+.bl-table td.bl-wrap { white-space: normal; min-width: 220px; max-width: 34ch; overflow-wrap: anywhere; }
+.bl-cap { margin: 10px 0 0; font-size: 13.5px; color: var(--steel); }
+.bl-chart { margin: 0 0 18px; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px 10px; margin-bottom: 18px; }
+.bl-chart h3 { font-size: 15px; margin: 0 0 8px; }
+.bl-chart svg { display: block; width: 100%; height: auto; }
+.bl-chart .bl-grid { stroke: var(--line-soft); stroke-width: 1; }
+.bl-chart .bl-axis { stroke: #9aa7b6; stroke-width: 1; }
+.bl-chart .bl-tick { font: 400 11px var(--body); fill: var(--steel); }
+.bl-chart .bl-bar { fill: var(--ink-2); }
+.bl-chart g:hover .bl-bar { fill: var(--ink); }
+.bl-chart .bl-val { font: 500 10.5px var(--body); fill: var(--ink-2); }
+.bl-chart p { margin: 6px 0 0; font-size: 12px; color: var(--steel); }
+
+/* ---------- Excel import and export ---------- */
+.bl-xl-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; }
+.bl-xl-grid > .panel + .panel { margin-top: 0; }
+.bl-xl-list { list-style: none; margin: 0; padding: 0; }
+.bl-xl-list li { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-soft); flex-wrap: wrap; }
+.bl-xl-list li:first-child { border-top: 0; padding-top: 0; }
+.bl-xl-list li > div { min-width: 0; flex: 1 1 220px; }
+.bl-xl-list li p { margin: 2px 0 0; font-size: 13.5px; color: var(--steel); }
+.bl-xl-list form { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.bl-xl-list select { width: auto; max-width: 260px; padding: 7px 34px 7px 10px; font-size: 14px; }
+.bl-options { display: grid; gap: 4px 24px; grid-template-columns: repeat(2, minmax(0, 1fr)); margin: 6px 0 4px; }
+.bl-options fieldset, .bl-options fieldset + fieldset { margin: 0; border-top: 0; padding-top: 0; }
+.bl-options legend { font: 500 14px/1.4 var(--body); margin-bottom: 4px; }
+.bl-options .check { margin: 4px 0; }
+.bl-summary { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 0 0 14px; padding: 0; list-style: none; font-size: 14.5px; }
+.bl-summary b { font-variant-numeric: tabular-nums; }
+.bl-preview td { vertical-align: top; }
+.bl-preview tr.is-bad td { background: #fdf6f5; }
+.bl-preview tr.is-bad td:first-child { color: var(--stop); }
+.bl-preview .bl-cell-bad { color: var(--stop); font-weight: 500; }
+.bl-errors { margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--stop); min-width: 260px; max-width: 48ch; }
+.bl-errors li + li { margin-top: 3px; }
+.bl-errors b { font-weight: 600; }
+.bl-commit { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; justify-content: space-between; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 16px; margin: 0 0 16px; }
+.bl-commit p { margin: 0; }
+
+@media (max-width: 900px) {
+  .bl-xl-grid, .bl-options { grid-template-columns: 1fr; }
+  .bl-doc .panel-body { padding: 18px; }
+  .bl-doc .panel-body > .table-wrap.flat { margin: 0 -18px; }
+  .bl-facts dd { text-align: left; }
+}
+
+/* ---------- Results page additions ---------- */
+.bl-results td.cell-main { min-width: 230px; max-width: 340px; overflow-wrap: anywhere; }
+.bl-results td[data-label="Highest bidder"] { min-width: 160px; }
+.bl-results td.actions .bl-tags { margin-top: 6px; }
+.bl-preview td.bl-wrap { min-width: 180px; max-width: 34ch; overflow-wrap: anywhere; }
+.bl-summary li.bad b { color: var(--stop); }
+.bl-lines-form td:nth-child(2) { width: 62%; }
+.bl-lines-form td:nth-child(2) input { width: 100%; }

@@ -25,11 +25,24 @@
   <div class="ac-mark"><%- include('../partials/mark', { size: 40 }) %></div>
   <h1>Register as a bidder</h1>
     <p class="ac-lead">Create an account for your company. After this you verify your email<% if (S.require_kyc_approval === '1') { %>, upload your business documents<% } %><% if (S.fee_enabled === '1') { %> and pay the registration fee<% } %> before you can bid.</p>
+  <% if (codeRequired) { %><p>Registration is by invitation: enter the sign-up code we sent you, or <a href="/contact">contact us to request a code</a>.</p><% } %>
   <%- include('../partials/flash') %>
   <% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Some details need fixing. Check the fields marked below.</div><% } %>
   <form method="post" action="/register" novalidate>
     <input type="hidden" name="_csrf" value="<%= csrf %>">
     <div>
+      <% if (codeRequired) { %>
+      <fieldset>
+        <legend>Sign-up code</legend>
+        <div class="form-grid">
+          <div class="field code-field">
+            <label for="r-code">Sign-up code<% if (!codeRequired) { %> <span class="muted">(optional)</span><% } %></label>
+            <input type="text" id="r-code" name="invite_code" value="<%= values.invite_code %>" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" <%= codeRequired ? 'required' : '' %> <%- errors.invite_code ? 'aria-invalid="true" aria-describedby="r-code-err"' : 'aria-describedby="r-code-hint"' %>>
+            <% if (errors.invite_code) { %><div class="err" id="r-code-err"><%= errors.invite_code %></div><% } else { %><div class="hint" id="r-code-hint">As written in your invitation email. Capitals and spaces do not matter.</div><% } %>
+          </div>
+        </div>
+      </fieldset>
+      <% } %>
       <fieldset>
         <legend>Your details</legend>
         <div class="form-grid">
@@ -83,6 +96,18 @@
           </div>
         </div>
       </fieldset>
+      <% if (!codeRequired) { %>
+        <details class="code-opt" <%= values.invite_code || errors.invite_code ? 'open' : '' %>>
+          <summary>I have a sign-up code</summary>
+          <div class="form-grid">
+          <div class="field code-field">
+            <label for="r-code">Sign-up code<% if (!codeRequired) { %> <span class="muted">(optional)</span><% } %></label>
+            <input type="text" id="r-code" name="invite_code" value="<%= values.invite_code %>" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="40" <%= codeRequired ? 'required' : '' %> <%- errors.invite_code ? 'aria-invalid="true" aria-describedby="r-code-err"' : 'aria-describedby="r-code-hint"' %>>
+            <% if (errors.invite_code) { %><div class="err" id="r-code-err"><%= errors.invite_code %></div><% } else { %><div class="hint" id="r-code-hint">As written in your invitation email. Capitals and spaces do not matter.</div><% } %>
+          </div>
+          </div>
+        </details>
+      <% } %>
       <div class="check">
         <input type="checkbox" id="r-accept" name="accept" value="1" <%= values.accept ? 'checked' : '' %>>
         <div>

@@ -76,13 +76,21 @@ async function sendVerification(user) {
 
 /* ---------------- Register ---------------- */
 
-const blankRegister = { name: '', email: '', phone: '', company_name: '', business_type: '', accept: false };
+const blankRegister = { name: '', email: '', phone: '', company_name: '', business_type: '', invite_code: '', accept: false };
+
+/** Sign-up codes are compared in upper case with all spaces removed ("ka 7f3 q" -> "KA7F3Q"). */
+const normCode = (s) => String(s || '').toUpperCase().replace(/\s+/g, '').slice(0, 40);
+const CODE_INVALID = 'This sign-up code is not valid, has expired or has already been used. Contact us for a new code.';
+// Same conditions as the consuming UPDATE below; used only to report a bad code together with other errors.
+const CODE_USABLE = `active AND (expires_at IS NULL OR expires_at > now()) AND used_count < max_uses`;
+class CodeError extends Error {}
 
 function renderRegister(res, values, errors, status = 200) {
   res.status(status);
   res.page('site/register', { fullBleed: true,
     title: 'Register as a bidder',
     open: settings.bool('registration_open'),
+    codeRequired: settings.bool('require_invite_code'),
     businessTypes: settings.list('business_types'),
     values, errors,
   });
@@ -90,7 +98,7 @@ function renderRegister(res, values, errors, status = 200) {
 
 router.get('/register', (req, res) => {
   if (req.user) return res.redirect('/account');
-  renderRegister(res, blankRegister, {});
+  renderRegister(res, { ...blankRegister, invite_code: normCode(req.query.code) }, {});
 });
 
 router.post('/register', registerLimiter, wrap(async (req, res) => {
@@ -102,8 +110,10 @@ router.post('/register', registerLimiter, wrap(async (req, res) => {
     phone: clean(b.phone, 20),
     company_name: clean(b.company_name, 150),
     business_type: clean(b.business_type, 60),
+    invite_code: normCode(b.invite_code),
     accept: b.accept === '1',
   };
+  const codeRequired = settings.bool('require_invite_code');
   const password = String(b.password || '');
   const confirm = String(b.confirm || '');
   const types = settings.list('business_types');
@@ -117,6 +127,8 @@ router.post('/register', registerLimiter, wrap(async (req, res) => {
   else if (password.length > 200) e.password = 'Use at most 200 characters.';
   if (!e.password && confirm !== password) e.confirm = 'The two passwords do not match.';
   if (!v.accept) e.accept = 'You need to accept the terms and conditions to register.';
+  if (codeRequired && !v.invite_code) e.invite_code = 'Enter the sign-up code we sent you. Registration is by invitation.';
+  else if (v.invite_code && !await db.one(`SELECT 1 FROM invite_codes WHERE code = $1 AND ${CODE_USABLE}`, [v.invite_code])) e.invite_code = CODE_INVALID;
   if (!e.email && await db.one('SELECT 1 FROM users WHERE lower(email) = $1', [v.email])) {
     e.email = 'An account with this email already exists. Sign in, or reset the password if you have forgotten it.';
   }
@@ -125,12 +137,26 @@ router.post('/register', registerLimiter, wrap(async (req, res) => {
   const hash = await bcrypt.hash(password, BCRYPT_COST);
   let user;
   try {
-    user = await db.one(
-      `INSERT INTO users(email, password_hash, name, phone, company_name, business_type, verify_token)
-       VALUES($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
-      [v.email, hash, v.name, v.phone, v.company_name, v.business_type, token()]
-    );
+    // The code is checked and used up in the same transaction that creates the account: two people racing
+    // for a single-use code cannot both get it, and a failed insert (email taken) leaves the code unused.
+    user = await db.tx(async (c) => {
+      let code = null;
+      if (v.invite_code) {
+        code = (await c.query(
+          `UPDATE invite_codes SET used_count = used_count + 1
+            WHERE code = $1 AND active AND (expires_at IS NULL OR expires_at > now()) AND used_count < max_uses
+        RETURNING id, group_id`, [v.invite_code]
+        )).rows[0];
+        if (!code) throw new CodeError(CODE_INVALID);
+      }
+      return (await c.query(
+        `INSERT INTO users(email, password_hash, name, phone, company_name, business_type, verify_token, invite_code_id, group_id)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING *`,
+        [v.email, hash, v.name, v.phone, v.company_name, v.business_type, token(), code ? code.id : null, code ? code.group_id : null]
+      )).rows[0];
+    });
   } catch (err) {
+    if (err instanceof CodeError) return renderRegister(res, v, { invite_code: err.message }, 422);
     if (err.code === '23505') {
       return renderRegister(res, v, { email: 'An account with this email already exists. Sign in, or reset the password if you have forgotten it.' }, 422);
     }

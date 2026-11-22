@@ -6,3 +6,17 @@
   <% if (r.result !== 'awarded') { %><button class="btn btn-sm" type="submit" name="decision" value="awarded" data-confirm="Award lot <%= r.lot_no %> to <%= r.name %> at <%= fmtINR(r.amount) %>? The bidder is emailed.">Award</button><% } %>
   <% if (r.result !== 'rejected') { %><button class="btn btn-danger btn-sm" type="submit" name="decision" value="rejected" data-confirm="Reject the highest bid on lot <%= r.lot_no %>?<%= r.result === 'awarded' ? ' The winner was already emailed that they won.' : '' %>">Reject</button><% } %>
 </form>
+<% if (r.result === 'awarded') { %>
+  <span class="bl-tags">
+  <% if (r.so_id) { %><a class="btn btn-quiet btn-sm" href="/admin/billing/sale-orders/<%= r.so_id %>">View sale order</a>
+  <% } else { %>
+    <form method="post" action="/admin/billing/sale-orders/issue" class="inline-form">
+      <%- include('_csrf') %>
+      <input type="hidden" name="lot_id" value="<%= r.id %>">
+      <input type="hidden" name="back" value="<%= backUrl %>">
+      <input type="hidden" name="open" value="1">
+      <button class="btn btn-quiet btn-sm" type="submit" data-confirm="Issue the sale order for lot <%= r.lot_no %> to <%= r.name %>? The buyer is emailed.">Issue sale order</button>
+    </form>
+  <% } %>
+  </span>
+<% } %>

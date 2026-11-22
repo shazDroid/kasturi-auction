@@ -7,7 +7,8 @@
 
 <% if (Object.keys(errors).length) { %><div class="notice notice-error" role="alert">Check the highlighted fields. The auction was not saved.</div><% } %>
 
-<form method="post" enctype="multipart/form-data" novalidate
+<div class="ax-with-preview">
+<form method="post" enctype="multipart/form-data" novalidate class="ax-main-form" id="auction-form"
       action="<%= auction ? '/admin/auctions/' + auction.id : '/admin/auctions' %>?_csrf=<%= csrf %>">
   <div class="panel">
     <div class="panel-head"><h3>What is being sold</h3></div>
@@ -40,27 +41,42 @@
     </div>
   </div>
 
-  <div class="panel">
-    <div class="panel-head"><h3>Cover photo</h3><span class="muted small">Optional. Shown on the auction list and at the top of the auction page.</span></div>
+  <div class="panel" id="photos">
+    <div class="panel-head"><h3>Photos</h3><span class="muted small"><%= photos.length %> of <%= MAX_PHOTOS %>. The first photo is the cover on the auction list and at the top of the auction page.</span></div>
     <div class="panel-body">
-      <div class="ax-cover-field">
-        <% if (auction && v.cover_id) { %>
-          <figure class="ax-cover-current">
-            <img src="/media/<%= v.cover_id %>?size=thumb" alt="Current cover photo of this auction" width="240" height="180">
-            <figcaption class="check">
-              <input type="checkbox" id="remove_cover" name="remove_cover" value="1" <%= v.remove_cover ? 'checked' : '' %>>
-              <label for="remove_cover">Remove cover photo</label>
-            </figcaption>
-          </figure>
-        <% } %>
-        <div class="field grow">
-          <label for="cover"><%= auction && v.cover_id ? 'Replace with another photo' : 'Choose a photo' %></label>
-          <input type="file" id="cover" name="cover" accept="image/jpeg,image/png,image/webp" data-preview="cover-preview" aria-describedby="cover-hint<%= errors.cover ? ' err-cover' : '' %>">
-          <%- include('_err', { k: 'cover' }) %>
-          <div class="hint" id="cover-hint">JPG, PNG or WebP, up to 8 MB. A wide photo of the heap or the yard works best; it is cropped to 4:3 in lists.<% if (Object.keys(errors).length) { %> If you had chosen a photo, choose it again.<% } %></div>
-          <div class="ax-previews" id="cover-preview" aria-live="polite"></div>
-        </div>
+      <% if (photos.length) { %>
+        <ol class="ax-gallery" aria-label="Photos of this auction, in display order">
+        <% photos.forEach(function (p, i) { %>
+          <li class="ax-photo">
+            <a href="/media/<%= p.file_id %>" target="_blank" rel="noopener" class="ax-photo-img"><img src="/media/<%= p.file_id %>?size=thumb" alt="Photo <%= i + 1 %> of this auction" width="320" height="240" loading="lazy"></a>
+            <div class="ax-photo-meta">
+              <% if (i === 0) { %><span class="tag tag-ok">Cover</span><% } else { %><span class="muted small">Photo <%= i + 1 %></span><% } %>
+              <% if (p.width) { %><span class="muted small"><%= p.width %> x <%= p.height %></span><% } %>
+            </div>
+            <div class="ax-photo-actions">
+              <% if (i > 0) { %><button class="linkbtn" type="submit" form="aph-<%= p.id %>" name="op" value="cover">Make cover</button><% } %>
+              <% if (i > 0) { %><button class="linkbtn" type="submit" form="aph-<%= p.id %>" name="op" value="left" aria-label="Move photo <%= i + 1 %> left">Move left</button><% } %>
+              <% if (i < photos.length - 1) { %><button class="linkbtn" type="submit" form="aph-<%= p.id %>" name="op" value="right" aria-label="Move photo <%= i + 1 %> right">Move right</button><% } %>
+              <button class="linkbtn danger" type="submit" form="aph-<%= p.id %>" name="op" value="remove" data-confirm="Remove photo <%= i + 1 %>? It is deleted and cannot be restored.">Remove</button>
+            </div>
+          </li>
+        <% }) %>
+        </ol>
+        <p class="hint muted small">Changes to photos are saved at once. Save other edits on this page first.</p>
+      <% } %>
+      <% if (photos.length < MAX_PHOTOS) { %>
+      <div class="field">
+        <label for="images"><%= photos.length ? 'Add more photos' : 'Add photos' %></label>
+        <input type="file" id="images" name="images" multiple accept="image/jpeg,image/png,image/webp" data-preview="images-preview" data-max-files="<%= MAX_PHOTOS - photos.length %>" data-max-what="auction" aria-describedby="images-hint<%= errors.images ? ' err-images' : '' %>">
+        <%- include('_err', { k: 'images' }) %>
+        <div class="hint" id="images-hint">JPG, PNG or WebP, up to 8 MB each. You can add <%= MAX_PHOTOS - photos.length %> more. <%= photos.length ? 'They are added after the existing photos.' : 'The first one becomes the cover.' %> A wide photo of the heap or the yard works best; covers are cropped in lists.<% if (Object.keys(errors).length) { %> If you had chosen photos, choose them again.<% } %></div>
+        <div class="ax-previews" id="images-preview" aria-live="polite"></div>
       </div>
+      <% if (auction) { %><input type="hidden" name="to_photos" value="1"><% } %>
+      <% } else { %>
+        <%- include('_err', { k: 'images' }) %>
+        <p class="muted small">This auction has the maximum of <%= MAX_PHOTOS %> photos. Remove one to add another.</p>
+      <% } %>
     </div>
   </div>
 
@@ -132,8 +148,43 @@
     </div>
   </div>
 
+  <div class="panel" id="visibility">
+    <div class="panel-head"><h3>Who can see and bid</h3></div>
+    <div class="panel-body">
+      <fieldset class="ax-radios">
+        <legend class="sr">Who can see and bid</legend>
+        <div class="check">
+          <input type="radio" id="vis-public" name="visibility" value="public" <%= v.visibility !== 'restricted' ? 'checked' : '' %>>
+          <div><label for="vis-public">Public</label><div class="hint">Every visitor can see the auction. Every eligible bidder can bid.</div></div>
+        </div>
+        <div class="check">
+          <input type="radio" id="vis-restricted" name="visibility" value="restricted" <%= v.visibility === 'restricted' ? 'checked' : '' %>>
+          <div><label for="vis-restricted">Restricted</label><div class="hint">Only bidders in the groups ticked below, and bidders you invite on the auction page, can see it and bid. Visitors and other bidders do not see it at all.</div></div>
+        </div>
+      </fieldset>
+      <div class="ax-groups-pick" data-show-for="restricted">
+        <% if (!groups.length) { %>
+          <p class="muted small">There are no bidder groups yet. <a href="/admin/groups/new">Create a group</a>, or save the auction and invite bidders one by one on the auction page.</p>
+        <% } else { %>
+          <fieldset>
+            <legend class="ax-legend">Bidder groups that can see it</legend>
+            <div class="ax-checklist">
+            <% groups.forEach(function (g) { %>
+              <div class="check"><input type="checkbox" id="grp-<%= g.id %>" name="group_ids" value="<%= g.id %>" <%= (v.group_ids || []).map(Number).indexOf(g.id) >= 0 ? 'checked' : '' %>><label for="grp-<%= g.id %>"><%= g.name %></label></div>
+            <% }) %>
+            </div>
+          </fieldset>
+          <%- include('_err', { k: 'group_ids' }) %>
+        <% } %>
+        <% var invites = auction ? auction.invite_count : 0; %>
+        <p class="hint muted small"><%= auction ? (invites ? invites + ' bidder' + (invites === 1 ? ' is' : 's are') + ' invited individually.' : 'No bidders are invited individually.') + ' Manage invited bidders on the auction page.' : 'After saving, you can also invite individual bidders on the auction page.' %></p>
+        <div class="notice notice-warn ax-nobody" data-nobody data-invites="<%= invites %>" <%= v.visibility === 'restricted' && !(v.group_ids || []).length && !invites ? '' : 'hidden' %>><p>Nobody can see this auction yet. Tick a group, or save and invite bidders on the auction page.</p></div>
+      </div>
+    </div>
+  </div>
+
   <div class="panel">
-    <div class="panel-head"><h3>Rules and visibility</h3></div>
+    <div class="panel-head"><h3>Rules and status</h3></div>
     <div class="panel-body">
       <div class="check">
         <input type="checkbox" id="show_highest_bid" name="show_highest_bid" value="1" <%= v.show_highest_bid ? 'checked' : '' %>>
@@ -157,6 +208,40 @@
 
   <div class="form-actions mt">
     <button class="btn" type="submit">Save auction</button>
+    <button class="btn btn-quiet" type="submit" name="preview" value="1">Save and preview</button>
     <a class="btn btn-quiet" href="<%= auction ? '/admin/auctions/' + auction.id : '/admin/auctions' %>">Cancel</a>
   </div>
 </form>
+
+<aside class="ax-live-preview" aria-label="Preview of the auction card" data-card-preview
+       data-cover="<%= v.cover_id ? '/media/' + v.cover_id + '?size=thumb' : '' %>"
+       data-starts="<%= v.starts_at ? new Date(v.starts_at).toISOString() : '' %>" data-ends="<%= v.ends_at ? new Date(v.ends_at).toISOString() : '' %>"
+       data-lots="<%= auction ? auction.lot_count : 0 %>">
+  <div class="ax-live-preview-head"><h2>Preview</h2><span class="muted small">The card on the public auction list</span></div>
+  <article class="a-card ax-card-preview" aria-hidden="true">
+    <div class="media">
+      <div class="badges"><span class="tag tag-upcoming" data-pv="phase">Upcoming</span><span class="tag tag-warn" data-pv="restricted" hidden>Restricted</span></div>
+      <img data-pv="img" alt="" width="640" height="400" <%- v.cover_id ? 'src="/media/' + v.cover_id + '?size=thumb"' : 'hidden' %>>
+      <div data-pv="ph" <%= v.cover_id ? 'hidden' : '' %>><%- include('../partials/ph', { category: v.category, sub: 'No photo yet' }) %></div>
+    </div>
+    <div class="body">
+      <div class="cat" data-pv="category-row" <%= v.category ? '' : 'hidden' %>><span data-pv="category"><%= v.category %></span></div>
+      <h3><span data-pv="title"><%= v.title || 'Auction title' %></span></h3>
+      <ul class="meta">
+        <li data-pv="seller-row"><%- include('../partials/icon', { name: 'factory', size: 17 }) %><span data-pv="seller"></span></li>
+        <li data-pv="location-row"><%- include('../partials/icon', { name: 'pin', size: 17 }) %><span data-pv="location"><%= v.location %></span></li>
+        <li><%- include('../partials/icon', { name: 'calendar', size: 17 }) %><span class="tnum" data-pv="when"></span></li>
+        <li><%- include('../partials/icon', { name: 'package', size: 17 }) %><span data-pv="lots"></span></li>
+      </ul>
+    </div>
+    <div class="foot">
+      <div class="when"><span data-pv="foot-label">Starts</span><b class="tnum" data-pv="foot-value"></b></div>
+      <span class="btn btn-sm btn-quiet" data-pv="foot-btn">View lots</span>
+    </div>
+  </article>
+  <p class="hint muted small" data-pv="note">Updates as you type. Times are IST.</p>
+</aside>
+</div>
+
+<% if (auction) { photos.forEach(function (p) { %><form id="aph-<%= p.id %>" method="post" action="/admin/auctions/<%= auction.id %>/photos/<%= p.id %>" class="hide"><%- include('_csrf') %></form>
+<% }) } %>

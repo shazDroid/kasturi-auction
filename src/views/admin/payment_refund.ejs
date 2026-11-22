@@ -15,6 +15,7 @@
         <% if (p.note) { %><dt>Note</dt><dd><%= p.note %></dd><% } %>
         <dt>Status</dt><dd><%- tag('payment', p.status) %></dd>
         <dt>Fee valid until</dt><dd><%= feeText || 'Not valid' %></dd>
+        <% if (inv) { %><dt>Tax invoice</dt><dd><a href="/admin/billing/invoices/<%= inv.id %>"><%= inv.number %></a> <span class="muted">(stays as issued; record the refund with a credit note in your accounts)</span></dd><% } %>
       </dl>
     </div>
   </div>

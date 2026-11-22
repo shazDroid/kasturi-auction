@@ -1,0 +1,106 @@
+<%
+  var invTag = function (st) { return { unpaid: 'tag tag-warn', part_paid: 'tag tag-upcoming', paid: 'tag tag-ok', cancelled: 'tag' }[st] || 'tag'; };
+  var selAuction = auctionId ? auctions.find(function (a) { return a.id === auctionId; }) : null;
+%>
+<div class="page-head">
+  <div>
+    <h1>Sale orders</h1>
+    <p>A sale order confirms an awarded lot to the buyer: the material value payable to the seller and the commission payable to us.</p>
+  </div>
+</div>
+
+<nav class="tabs" aria-label="Sale orders">
+  <a href="<%= urlWith({ tab: '', page: '' }) %>" <%- tab === 'pending' ? 'aria-current="page"' : '' %>>Awarded lots without a sale order (<%= counts.pending %>)</a>
+  <a href="<%= urlWith({ tab: 'issued', page: '' }) %>" <%- tab === 'issued' ? 'aria-current="page"' : '' %>>Issued (<%= counts.issued %>)</a>
+</nav>
+
+<form class="filters" method="get" action="/admin/billing/sale-orders">
+  <% if (tab === 'issued') { %><input type="hidden" name="tab" value="issued"><% } %>
+  <label class="sr" for="f-q">Search</label>
+  <input type="search" id="f-q" name="q" value="<%= q %>" placeholder="<%= tab === 'issued' ? 'Number, buyer, lot or auction' : 'Buyer, lot or auction' %>">
+  <label class="sr" for="f-auction">Auction</label>
+  <select id="f-auction" name="auction">
+    <option value="">All auctions</option>
+    <% auctions.forEach(function (a) { %><option value="<%= a.id %>" <%= auctionId === a.id ? 'selected' : '' %>><%= a.title %> (<%= fmtDate(a.ends_at) %>)</option><% }) %>
+  </select>
+  <button class="btn btn-quiet" type="submit">Filter</button>
+  <% if (q || auctionId) { %><a href="<%= tab === 'issued' ? '/admin/billing/sale-orders?tab=issued' : '/admin/billing/sale-orders' %>">Clear filters</a><% } %>
+</form>
+
+<% if (tab === 'pending' && selAuction && rows.length) { %>
+  <form method="post" action="/admin/billing/sale-orders/issue-auction" class="bl-bulk">
+    <%- include('_csrf') %>
+    <input type="hidden" name="auction_id" value="<%= selAuction.id %>">
+    <input type="hidden" name="back" value="<%= urlWith({}) %>">
+    <span>Every awarded lot in <b><%= selAuction.title %></b> that has no sale order yet.</span>
+    <button class="btn" type="submit" data-confirm="Issue sale orders for all awarded lots in this auction? Each buyer is emailed.">Issue for all in this auction</button>
+  </form>
+<% } else if (tab === 'pending' && rows.length) { %>
+  <p class="muted small">To issue sale orders for a whole auction at once, choose the auction above.</p>
+<% } %>
+
+<div class="table-wrap">
+<% if (!rows.length) { %>
+  <div class="empty">
+    <% if (tab === 'pending') { %><h3>Every awarded lot has a sale order</h3><p>Lots appear here when you award them on the <a href="/admin/results">Results</a> page.</p>
+    <% } else { %><h3>No sale orders<%= q || auctionId ? ' match these filters' : ' yet' %></h3><p>Issue one from the first tab once a lot is awarded.</p><% } %>
+  </div>
+<% } else if (tab === 'pending') { %>
+  <table class="table table-stack">
+    <thead><tr><th>Auction and lot</th><th>Buyer</th><th class="num">Quantity</th><th class="num">Rate</th><th class="num">Material value</th><th class="num">Commission</th><th>Closed</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (r) { %>
+      <tr>
+        <td class="cell-main bl-desc"><a class="primary" href="/admin/lots/<%= r.id %>">Lot <%= r.lot_no %>: <%= r.title %></a><span class="sub"><a href="/admin/auctions/<%= r.auction_id %>"><%= r.auction_title %></a></span></td>
+        <td data-label="Buyer" class="bl-party"><a href="/admin/bidders/<%= r.user_id %>"><%= r.name %></a><span class="sub"><%= r.company_name %></span></td>
+        <td class="num" data-label="Quantity"><%= fmtNum(r.quantity) %> <%= r.unit %></td>
+        <td class="num" data-label="Rate"><%= fmtINR(r.rate) %><span class="sub">per <%= r.unit %></span></td>
+        <td class="num" data-label="Material value"><b><%= fmtINR(r.value) %></b></td>
+        <td class="num" data-label="Commission"><%= fmtINR(r.commission) %><span class="sub"><%= fmtNum(r.pct) %>%</span></td>
+        <td data-label="Closed" class="nowrap"><%= fmtDate(r.ends_at) %></td>
+        <td class="actions">
+          <form method="post" action="/admin/billing/sale-orders/issue" class="inline-form">
+            <%- include('_csrf') %>
+            <input type="hidden" name="lot_id" value="<%= r.id %>">
+            <input type="hidden" name="back" value="<%= urlWith({}) %>">
+            <button class="btn btn-sm" type="submit" data-confirm="Issue the sale order for lot <%= r.lot_no %> to <%= r.name %>? The buyer is emailed.">Issue sale order</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } else { %>
+  <table class="table table-stack">
+    <thead><tr><th>Number</th><th>Auction and lot</th><th>Buyer</th><th class="num">Quantity</th><th class="num">Rate</th><th class="num">Material value</th><th class="num">Commission</th><th>Settlement</th><th></th></tr></thead>
+    <tbody>
+    <% rows.forEach(function (r) { var s = r.snapshot; %>
+      <tr>
+        <td class="cell-main"><a class="primary nowrap" href="/admin/billing/sale-orders/<%= r.id %>"><%= r.number %></a><span class="sub"><%= fmtDate(r.issued_at) %></span></td>
+        <td data-label="Auction and lot" class="bl-desc">Lot <%= s.lot.lot_no %>: <%= s.lot.title %><span class="sub clip"><%= s.auction.title %></span></td>
+        <td data-label="Buyer" class="bl-party"><a href="/admin/bidders/<%= r.user_id %>"><%= r.name %></a><span class="sub"><%= r.company_name %></span></td>
+        <td class="num" data-label="Quantity"><%= fmtNum(s.lot.quantity) %> <%= s.lot.unit %></td>
+        <td class="num" data-label="Rate"><%= fmtINR(s.rate) %></td>
+        <td class="num" data-label="Material value"><b><%= fmtINR(s.material_value) %></b></td>
+        <td class="num" data-label="Commission"><%= fmtINR(s.commission) %><span class="sub"><%= r.inv_number ? r.inv_number : (s.commission > 0 ? 'Not invoiced' : fmtNum(s.commission_percent) + '%') %></span></td>
+        <td data-label="Settlement">
+          <span class="bl-tags">
+            <%- r.buyer_paid_at ? '<span class="tag tag-ok">Buyer paid</span>' : '<span class="tag">Payment pending</span>' %>
+            <%- r.lifted_at ? '<span class="tag tag-ok">Lifted</span>' : '<span class="tag">Not lifted</span>' %>
+            <% if (r.result !== 'awarded') { %><span class="tag tag-bad">Award withdrawn</span><% } %>
+          </span>
+        </td>
+        <td class="actions">
+          <a href="/admin/billing/sale-orders/<%= r.id %>.pdf" target="_blank" rel="noopener">PDF</a>
+          <form method="post" action="/admin/billing/sale-orders/<%= r.id %>/email" class="inline-form">
+            <%- include('_csrf') %><input type="hidden" name="back" value="<%= urlWith({}) %>">
+            <button class="linkbtn" type="submit" data-confirm="Email sale order <%= r.number %> to the buyer again?">Email again</button>
+          </form>
+        </td>
+      </tr>
+    <% }) %>
+    </tbody>
+  </table>
+<% } %>
+</div>
+<%- include('_pager') %>

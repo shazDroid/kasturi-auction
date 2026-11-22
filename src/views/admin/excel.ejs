@@ -1,0 +1,121 @@
+<div class="page-head">
+  <div>
+    <h1>Import and export</h1>
+    <p>Download auctions, lots, bidders, bids and results as Excel, or add lots and whole auctions from a spreadsheet. Times in the files are IST.</p>
+  </div>
+</div>
+
+<% if (pending) { %>
+  <div class="notice notice-warn bl-notice-row">
+    <p>An import of "<%= pending.file %>" is waiting for you to check it. Nothing has been saved yet.</p>
+    <a class="btn btn-sm" href="/admin/excel/import/review">Continue checking</a>
+  </div>
+<% } %>
+
+<div class="bl-xl-grid">
+  <section class="panel">
+    <div class="panel-head"><h3>Import lots into an auction</h3></div>
+    <div class="panel-body">
+      <% if (!importable.length) { %>
+        <p class="muted">There is no auction open for new lots. Lots can only be added to a draft, upcoming or live auction whose closing time has not passed. <a href="/admin/auctions/new">Create an auction</a> first.</p>
+      <% } else { %>
+      <form method="post" action="/admin/excel/import/lots?_csrf=<%= csrf %>" enctype="multipart/form-data">
+        <div class="field">
+          <label for="i-auction">Auction</label>
+          <select id="i-auction" name="auction_id" required>
+            <% if (importable.length > 1) { %><option value="">Choose the auction</option><% } %>
+            <% importable.forEach(function (a) { %><option value="<%= a.id %>" <%= preset === a.id ? 'selected' : '' %>><%= a.title %> (<%= label('phase', a.phase) %>, starts <%= fmtDate(a.starts_at) %>, <%= a.lots %> lot<%= a.lots === 1 ? '' : 's' %>)</option><% }) %>
+          </select>
+        </div>
+        <div class="field">
+          <label for="i-file">Excel file (.xlsx, up to 5 MB and 2,000 lots)</label>
+          <input type="file" id="i-file" name="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+          <div class="hint">Columns: lot_no, title, description, quantity, unit, start_price, increment, reserve_price, any "spec: Label" columns and "group price: Group" columns. <a href="/admin/excel/template/lots.xlsx">Download the lot import template</a>.</div>
+        </div>
+        <div class="bl-options">
+          <fieldset>
+            <legend>Rows with errors</legend>
+            <div class="check"><input type="radio" id="inv-skip" name="invalid" value="skip" checked><label for="inv-skip">Skip them and import the rest</label></div>
+            <div class="check"><input type="radio" id="inv-refuse" name="invalid" value="refuse"><label for="inv-refuse">Refuse the whole file</label></div>
+          </fieldset>
+          <fieldset>
+            <legend>Lot number already in the auction</legend>
+            <div class="check"><input type="radio" id="dup-skip" name="dup" value="skip" checked><label for="dup-skip">Skip the row</label></div>
+            <div class="check"><input type="radio" id="dup-update" name="dup" value="update"><label for="dup-update">Update the existing lot (only if it has no bids)</label></div>
+            <div class="check"><input type="radio" id="dup-new" name="dup" value="new"><label for="dup-new">Add as a new lot number</label></div>
+          </fieldset>
+        </div>
+        <div class="form-actions"><button class="btn" type="submit">Check the file</button></div>
+        <p class="hint small muted">You will see every row with any problems before anything is saved.</p>
+      </form>
+      <% } %>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-head"><h3>Import auctions with their lots</h3></div>
+    <div class="panel-body">
+      <form method="post" action="/admin/excel/import/auctions?_csrf=<%= csrf %>" enctype="multipart/form-data">
+        <div class="field">
+          <label for="a-file">Excel file (.xlsx) with an Auctions sheet and a Lots sheet</label>
+          <input type="file" id="a-file" name="file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
+          <div class="hint">Imported auctions are always created as drafts, so you can check them, add photos and publish. <a href="/admin/excel/template/auctions.xlsx">Download the auction and lots import template</a>.</div>
+        </div>
+        <div class="bl-options">
+          <fieldset>
+            <legend>Rows with errors</legend>
+            <div class="check"><input type="radio" id="ainv-skip" name="invalid" value="skip" checked><label for="ainv-skip">Skip them and import the rest</label></div>
+            <div class="check"><input type="radio" id="ainv-refuse" name="invalid" value="refuse"><label for="ainv-refuse">Refuse the whole file</label></div>
+          </fieldset>
+          <fieldset>
+            <legend>Sellers</legend>
+            <div class="check"><input type="checkbox" id="a-sellers" name="create_sellers" value="1"><label for="a-sellers">Create sellers that do not exist yet</label></div>
+          </fieldset>
+        </div>
+        <div class="form-actions"><button class="btn" type="submit">Check the file</button></div>
+      </form>
+    </div>
+  </section>
+</div>
+
+<section class="admin-section">
+  <h2>Export to Excel</h2>
+  <div class="panel">
+    <div class="panel-body">
+      <ul class="bl-xl-list">
+        <li>
+          <div><b>All auctions</b><p>One row per auction with every editable field. Descriptions come as plain text with the formatted HTML in separate columns.</p></div>
+          <a class="btn btn-quiet" href="/admin/excel/export/auctions.xlsx">Download auctions</a>
+        </li>
+        <li>
+          <div><b>Lots</b><p>Lots with specifications and group prices, in the same columns as the lot import.</p></div>
+          <form method="get" action="/admin/excel/export/lots.xlsx">
+            <label class="sr" for="x-lots">Auction</label>
+            <select id="x-lots" name="auction"><option value="">All auctions</option><% auctions.forEach(function (a) { %><option value="<%= a.id %>"><%= a.title %> (<%= fmtDate(a.starts_at) %>)</option><% }) %></select>
+            <button class="btn btn-quiet" type="submit">Download lots</button>
+          </form>
+        </li>
+        <li>
+          <div><b>Bidders</b><p>Business details, group, document status and fee validity of every bidder.</p></div>
+          <a class="btn btn-quiet" href="/admin/excel/export/bidders.xlsx">Download bidders</a>
+        </li>
+        <li>
+          <div><b>Bids of an auction</b><p>Every bid with time, bidder, amount and whether auto-bidding placed it.</p></div>
+          <form method="get" action="/admin/excel/export/bids.xlsx">
+            <label class="sr" for="x-bids">Auction</label>
+            <select id="x-bids" name="auction" required><option value="">Choose an auction</option><% auctions.forEach(function (a) { %><option value="<%= a.id %>"><%= a.title %> (<%= fmtDate(a.starts_at) %>)</option><% }) %></select>
+            <button class="btn btn-quiet" type="submit">Download bids</button>
+          </form>
+        </li>
+        <li>
+          <div><b>Results of an auction</b><p>Each lot with its result, winner, value, commission and sale order.</p></div>
+          <form method="get" action="/admin/excel/export/results.xlsx">
+            <label class="sr" for="x-res">Auction</label>
+            <select id="x-res" name="auction" required><option value="">Choose an auction</option><% auctions.forEach(function (a) { %><option value="<%= a.id %>"><%= a.title %> (<%= fmtDate(a.starts_at) %>)</option><% }) %></select>
+            <button class="btn btn-quiet" type="submit">Download results</button>
+          </form>
+        </li>
+      </ul>
+    </div>
+  </div>
+</section>

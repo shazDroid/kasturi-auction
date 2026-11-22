@@ -1,0 +1,103 @@
+<div class="page-head">
+  <div>
+    <h1 class="row"><span class="ax-code-lg"><%= c.code %></span> <%- include('_code_state', { s: c.state }) %></h1>
+    <p><%= c.label || 'Sign-up code' %></p>
+  </div>
+  <div class="row">
+    <button type="button" class="btn btn-quiet" data-copy="<%= c.code %>" hidden>Copy code</button>
+    <% if (c.active) { %>
+      <form method="post" action="/admin/codes/<%= c.id %>/deactivate" class="inline-form"><%- include('_csrf') %>
+        <button class="btn btn-danger" type="submit" data-confirm="Deactivate <%= c.code %>? Nobody can register with it until you reactivate it.">Deactivate</button>
+      </form>
+    <% } else { %>
+      <form method="post" action="/admin/codes/<%= c.id %>/reactivate" class="inline-form"><%- include('_csrf') %>
+        <button class="btn btn-quiet" type="submit">Reactivate</button>
+      </form>
+    <% } %>
+    <% if (!c.used_count && !c.user_count) { %>
+      <form method="post" action="/admin/codes/<%= c.id %>/delete" class="inline-form"><%- include('_csrf') %>
+        <button class="btn btn-danger" type="submit" data-confirm="Delete code <%= c.code %>? It has never been used.">Delete</button>
+      </form>
+    <% } %>
+  </div>
+</div>
+
+<%- include('_code_notice') %>
+
+<div class="cols">
+  <div>
+    <div class="panel">
+      <div class="panel-head"><h3>Details</h3></div>
+      <div class="panel-body">
+        <dl class="kv">
+          <dt>Registration link</dt><dd><span class="ax-break"><%= url %></span> <button type="button" class="linkbtn small" data-copy="<%= url %>" hidden>Copy link</button></dd>
+          <dt>Uses</dt><dd><%= c.used_count %> of <%= fmtNum(c.max_uses) %> used<%= c.used_count < c.max_uses ? ', ' + (c.max_uses - c.used_count) + ' left' : '' %></dd>
+          <dt>Group</dt><dd><% if (c.group_name) { %><a href="/admin/groups/<%= c.group_id %>"><%= c.group_name %></a><% } else { %>None, bidders pay the default fee and commission<% } %></dd>
+          <dt>Expires</dt><dd><%= c.expires_at ? fmtDT(c.expires_at) + ' IST' : 'No expiry' %></dd>
+          <dt>Created</dt><dd><%= fmtDT(c.created_at) %></dd>
+        </dl>
+      </div>
+    </div>
+
+    <section class="admin-section">
+      <h2>Bidders who registered with this code</h2>
+      <div class="table-wrap">
+      <% if (!users.length) { %>
+        <div class="empty"><h3>Nobody has used this code yet</h3><p>Bidders who register with it appear here.</p></div>
+      <% } else { %>
+        <table class="table table-stack">
+          <thead><tr><th>Bidder no</th><th>Bidder</th><th>Email</th><th>Group now</th><th>Documents</th><th>Registered</th></tr></thead>
+          <tbody>
+          <% users.forEach(function (u) { %>
+            <tr>
+              <td data-label="Bidder no" class="nowrap"><span class="code"><%= bidderNo(u.id) %></span></td>
+              <td class="cell-main"><a class="primary" href="/admin/bidders/<%= u.id %>"><%= u.company_name || u.name %></a><span class="sub"><%= u.company_name ? u.name : '' %></span></td>
+              <td data-label="Email"><%= u.email %></td>
+              <td data-label="Group now"><%= u.group_name || 'None' %></td>
+              <td data-label="Documents"><%- tag('kyc', u.kyc_status) %></td>
+              <td data-label="Registered" class="nowrap"><%= fmtDate(u.created_at) %></td>
+            </tr>
+          <% }) %>
+          </tbody>
+        </table>
+      <% } %>
+      </div>
+    </section>
+  </div>
+
+  <div class="side-stack">
+    <form method="post" action="/admin/codes/<%= c.id %>/email" class="panel" id="email" novalidate>
+      <div class="panel-head"><h3>Email this code</h3></div>
+      <div class="panel-body">
+        <%- include('_csrf') %>
+        <% if (errors.form) { %><div class="notice notice-error" role="alert"><p><%= errors.form %></p></div><% } else if (c.state !== 'active') { %><p class="muted small">This code cannot be used right now, so it cannot be emailed.</p><% } %>
+        <div class="field">
+          <label for="m-name">Recipient name</label>
+          <input type="text" id="m-name" name="name" value="<%= m.name || '' %>" maxlength="200" required>
+          <%- include('_err', { k: 'name' }) %>
+        </div>
+        <div class="field">
+          <label for="m-company">Company</label>
+          <input type="text" id="m-company" name="company" value="<%= m.company || '' %>" maxlength="200">
+        </div>
+        <div class="field">
+          <label for="m-email">Email</label>
+          <input type="email" id="m-email" name="email" value="<%= m.email || '' %>" maxlength="200" required>
+          <%- include('_err', { k: 'email' }) %>
+          <div class="hint">Sent with the "Sign-up code invitation" template. <a href="/admin/emails/templates/invite_code">Edit the wording</a>.</div>
+        </div>
+        <button class="btn btn-sm" type="submit" <%= c.state === 'active' ? '' : 'disabled' %>>Send invitation</button>
+      </div>
+    </form>
+    <% if (sent.length) { %>
+    <div class="panel">
+      <div class="panel-head"><h3>Sent invitations</h3></div>
+      <div class="panel-body">
+        <ul class="ax-plain-list small">
+          <% sent.forEach(function (s) { %><li><%= s.to_email %><span class="muted">, <%= fmtDT(s.created_at) %>, <%= s.status %></span></li><% }) %>
+        </ul>
+      </div>
+    </div>
+    <% } %>
+  </div>
+</div>

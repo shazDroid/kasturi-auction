@@ -13,7 +13,7 @@
         <td data-label="Company"><%= b.company_name %></td>
         <td class="num amt" data-label="Amount"><%= fmtINR(b.amount) %></td>
         <td data-label="IP address"><span class="code"><%= b.ip || 'Not recorded' %></span></td>
-        <td data-label="Status"><% if (b.cancelled) { %><span class="tag tag-bad">Cancelled</span><% if (b.cancel_note) { %><span class="sub"><%= b.cancel_note %></span><% } %><% } else { %><span class="tag">Valid</span><% } %></td>
+        <td data-label="Status"><% if (b.cancelled) { %><span class="tag tag-bad">Cancelled</span><% if (b.cancel_note) { %><span class="sub"><%= b.cancel_note %></span><% } %><% } else { %><span class="tag">Valid</span><% } %><% if (b.auto) { %> <span class="tag tag-upcoming" title="Placed by auto-bidding up to the bidder's maximum">Auto</span><% } %></td>
         <td class="actions"><% if (!b.cancelled) { %><a class="danger-link" href="/admin/bids/<%= b.id %>/cancel">Cancel bid</a><% } %></td>
       </tr>
     <% }) %>

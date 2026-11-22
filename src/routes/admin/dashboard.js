@@ -61,7 +61,14 @@ router.get('/', wrap(async (req, res) => {
        (SELECT COALESCE(sum(amount), 0) FROM payments WHERE status = 'paid'
           AND paid_at >= date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata') AT TIME ZONE 'Asia/Kolkata') AS fee_month,
        (SELECT count(*)::int FROM enquiries WHERE NOT handled) AS open_enquiries,
-       (SELECT count(*)::int FROM email_log WHERE status = 'failed' AND created_at > now() - interval '24 hours') AS failed_mail`
+       (SELECT count(*)::int FROM email_log WHERE status = 'failed' AND created_at > now() - interval '24 hours') AS failed_mail,
+       (SELECT count(*)::int FROM bidder_groups) AS groups,
+       (SELECT count(*)::int FROM users WHERE group_id IS NOT NULL) AS grouped_bidders,
+       (SELECT count(*)::int FROM invite_codes WHERE active AND used_count < max_uses AND (expires_at IS NULL OR expires_at > now())) AS active_codes,
+       (SELECT count(*)::int FROM auctions a WHERE a.visibility = 'restricted' AND (${PHASE_SQL}) IN ('live', 'upcoming')) AS restricted_open,
+       (SELECT count(*)::int FROM auctions a WHERE a.visibility = 'restricted' AND (${PHASE_SQL}) IN ('live', 'upcoming', 'draft')
+           AND NOT EXISTS (SELECT 1 FROM auction_groups ag WHERE ag.auction_id = a.id)
+           AND NOT EXISTS (SELECT 1 FROM auction_invites ai WHERE ai.auction_id = a.id)) AS restricted_nobody`
   );
 
   const live = await db.many(
@@ -96,6 +103,7 @@ router.get('/', wrap(async (req, res) => {
 
   const transport = mailer.transportName();
   const attention = [];
+  if (stats.restricted_nobody) attention.push({ text: `${stats.restricted_nobody} restricted auction${stats.restricted_nobody === 1 ? ' has' : 's have'} no groups and no invited bidders, so nobody can see ${stats.restricted_nobody === 1 ? 'it' : 'them'}.`, href: '/admin/auctions?vis=restricted', action: 'Check restricted auctions' });
   if (stats.pending_kyc) attention.push({ text: `${stats.pending_kyc} bidder${stats.pending_kyc === 1 ? ' has' : 's have'} submitted documents for review.`, href: '/admin/bidders?kyc=pending', action: 'Review documents' });
   if (stats.pending_results) attention.push({ text: `${stats.pending_results} closed lot${stats.pending_results === 1 ? ' is' : 's are'} waiting for an award or rejection.`, href: '/admin/results', action: 'Decide results' });
   if (stats.open_enquiries) attention.push({ text: `${stats.open_enquiries} enquir${stats.open_enquiries === 1 ? 'y has' : 'ies have'} not been handled.`, href: '/admin/enquiries', action: 'Open enquiries' });

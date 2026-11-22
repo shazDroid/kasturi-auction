@@ -236,3 +236,140 @@ CREATE INDEX IF NOT EXISTS auction_documents_auction ON auction_documents(auctio
 INSERT INTO lot_images(lot_id, file_id)
 SELECT l.id, l.image_id FROM lots l
  WHERE l.image_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM lot_images li WHERE li.lot_id = l.id);
+
+-- ---------- v3: bidder groups, restricted auctions, sign-up codes, auto-bids, watchlist, sale orders ----------
+CREATE TABLE IF NOT EXISTS bidder_groups (
+  id                 serial PRIMARY KEY,
+  name               text NOT NULL UNIQUE,
+  description        text NOT NULL DEFAULT '',
+  -- NULL means "use the default registration fee from Settings"
+  fee_amount         numeric(14,2),
+  -- NULL means "use the default buyer's commission from Settings"
+  commission_percent numeric(6,2),
+  created_at         timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS group_id integer REFERENCES bidder_groups(id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS invite_codes (
+  id         serial PRIMARY KEY,
+  code       text NOT NULL UNIQUE,
+  label      text NOT NULL DEFAULT '',          -- who it was issued to, for the admin's reference
+  group_id   integer REFERENCES bidder_groups(id) ON DELETE SET NULL,  -- bidders who sign up with it join this group
+  max_uses   integer NOT NULL DEFAULT 1,
+  used_count integer NOT NULL DEFAULT 0,
+  expires_at timestamptz,
+  active     boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS invite_code_id integer REFERENCES invite_codes(id) ON DELETE SET NULL;
+
+-- 'public': everyone. 'restricted': only bidders in auction_groups or auction_invites (and admins).
+ALTER TABLE auctions ADD COLUMN IF NOT EXISTS visibility text NOT NULL DEFAULT 'public';
+ALTER TABLE auctions ADD COLUMN IF NOT EXISTS watch_alert_sent boolean NOT NULL DEFAULT false;
+CREATE TABLE IF NOT EXISTS auction_groups (
+  auction_id integer NOT NULL REFERENCES auctions(id) ON DELETE CASCADE,
+  group_id   integer NOT NULL REFERENCES bidder_groups(id) ON DELETE CASCADE,
+  PRIMARY KEY (auction_id, group_id)
+);
+CREATE TABLE IF NOT EXISTS auction_invites (
+  auction_id integer NOT NULL REFERENCES auctions(id) ON DELETE CASCADE,
+  user_id    integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  PRIMARY KEY (auction_id, user_id)
+);
+
+-- Additional auction photos. auctions.cover_id always points at the first one (kept in sync by the admin code).
+CREATE TABLE IF NOT EXISTS auction_images (
+  id         serial PRIMARY KEY,
+  auction_id integer NOT NULL REFERENCES auctions(id) ON DELETE CASCADE,
+  file_id    integer NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+  sort_order integer NOT NULL DEFAULT 0,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS auction_images_auction ON auction_images(auction_id, sort_order, id);
+INSERT INTO auction_images(auction_id, file_id)
+SELECT a.id, a.cover_id FROM auctions a
+ WHERE a.cover_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM auction_images ai WHERE ai.auction_id = a.id);
+
+-- A lot can open at a different start price for a bidder group.
+CREATE TABLE IF NOT EXISTS lot_group_prices (
+  lot_id      integer NOT NULL REFERENCES lots(id) ON DELETE CASCADE,
+  group_id    integer NOT NULL REFERENCES bidder_groups(id) ON DELETE CASCADE,
+  start_price numeric(14,2) NOT NULL,
+  PRIMARY KEY (lot_id, group_id)
+);
+
+-- Auto-bidding: the system bids for the bidder, one increment at a time, up to max_amount.
+CREATE TABLE IF NOT EXISTS proxy_bids (
+  id         serial PRIMARY KEY,
+  lot_id     integer NOT NULL REFERENCES lots(id) ON DELETE CASCADE,
+  user_id    integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  max_amount numeric(14,2) NOT NULL,
+  active     boolean NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (lot_id, user_id)
+);
+ALTER TABLE bids ADD COLUMN IF NOT EXISTS auto boolean NOT NULL DEFAULT false;  -- placed by auto-bidding
+
+-- Buyer's commission percentage fixed at the moment a lot is awarded.
+ALTER TABLE lots ADD COLUMN IF NOT EXISTS commission_percent numeric(6,2);
+
+CREATE TABLE IF NOT EXISTS watchlist (
+  user_id    integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  auction_id integer NOT NULL REFERENCES auctions(id) ON DELETE CASCADE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (user_id, auction_id)
+);
+
+CREATE TABLE IF NOT EXISTS sale_orders (
+  id         serial PRIMARY KEY,
+  number     text NOT NULL UNIQUE,              -- e.g. KA/SO/2026/0001
+  lot_id     integer NOT NULL UNIQUE REFERENCES lots(id) ON DELETE CASCADE,
+  user_id    integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  -- everything printed on the document, frozen when it was issued
+  snapshot   jsonb NOT NULL,
+  issued_by  integer REFERENCES admins(id) ON DELETE SET NULL,
+  issued_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- ---------- v3 billing ----------
+-- kind: registration_fee (raised automatically when a fee is paid), commission (buyer's commission on an
+-- awarded lot), other (raised by hand). Sale orders are award documents, not invoices: the material itself
+-- is invoiced by the seller.
+CREATE TABLE IF NOT EXISTS invoices (
+  id          serial PRIMARY KEY,
+  number      text NOT NULL UNIQUE,             -- e.g. KA/INV/2026-27/0001
+  kind        text NOT NULL,
+  user_id     integer NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  lot_id      integer REFERENCES lots(id) ON DELETE SET NULL,
+  payment_id  integer REFERENCES payments(id) ON DELETE SET NULL,
+  -- bill-to details, line items [{description, hsn_sac, qty, unit, rate, amount}], tax lines: frozen at issue
+  snapshot    jsonb NOT NULL,
+  subtotal    numeric(14,2) NOT NULL,
+  tax         numeric(14,2) NOT NULL DEFAULT 0,
+  total       numeric(14,2) NOT NULL,
+  status      text NOT NULL DEFAULT 'unpaid',   -- unpaid | part_paid | paid | cancelled
+  issued_at   timestamptz NOT NULL DEFAULT now(),
+  due_at      timestamptz,
+  issued_by   integer REFERENCES admins(id) ON DELETE SET NULL,
+  cancel_note text NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS invoices_user ON invoices(user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS invoices_one_per_payment ON invoices(payment_id) WHERE payment_id IS NOT NULL;
+
+CREATE TABLE IF NOT EXISTS invoice_payments (
+  id          serial PRIMARY KEY,
+  invoice_id  integer NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+  amount      numeric(14,2) NOT NULL,
+  method      text NOT NULL DEFAULT 'bank_transfer',  -- bank_transfer | upi | cheque | cash | razorpay | adjustment
+  reference   text NOT NULL DEFAULT '',
+  paid_on     date NOT NULL DEFAULT CURRENT_DATE,
+  note        text NOT NULL DEFAULT '',
+  recorded_by integer REFERENCES admins(id) ON DELETE SET NULL,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+
+-- Settlement of an awarded lot between buyer and seller, tracked by the admin.
+ALTER TABLE lots ADD COLUMN IF NOT EXISTS buyer_paid_at timestamptz;   -- buyer's payment for the material confirmed
+ALTER TABLE lots ADD COLUMN IF NOT EXISTS lifted_at     timestamptz;   -- material collected
+ALTER TABLE lots ADD COLUMN IF NOT EXISTS settlement_note text NOT NULL DEFAULT '';

@@ -75,6 +75,36 @@
     paint(); setInterval(paint, 15000);
   }
 
+  // Watch buttons (views/partials/watch.ejs): toggle in place with fetch; the form still works without JavaScript.
+  document.addEventListener('submit', function (e) {
+    var f = e.target.closest('form[data-watch]');
+    if (!f || !window.fetch) return;
+    e.preventDefault();
+    var id = f.getAttribute('data-watch');
+    var btn = f.querySelector('button');
+    var on = btn.getAttribute('aria-pressed') !== 'true';
+    var csrf = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+    btn.disabled = true;
+    fetch('/auctions/' + id + (on ? '/watch' : '/unwatch'), {
+      method: 'POST', credentials: 'same-origin', headers: { Accept: 'application/json', 'x-csrf-token': csrf }
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) { return { status: r.status, d: d }; });
+    }).then(function (res) {
+      if (res.status === 401 && res.d.login) { window.location = res.d.login; return; }
+      if (!res.d.ok) { KA.toast(res.d.error || 'Your watchlist was not updated. Try again.', 'bad'); return; }
+      document.querySelectorAll('form[data-watch="' + id + '"]').forEach(function (g) {
+        var b = g.querySelector('button');
+        b.setAttribute('aria-pressed', on ? 'true' : 'false');
+        b.querySelector('.w-label').textContent = on ? b.getAttribute('data-on') : b.getAttribute('data-off');
+        g.setAttribute('action', '/auctions/' + id + (on ? '/unwatch' : '/watch'));
+      });
+      var mins = Number(f.getAttribute('data-alert-min')) || 0;
+      KA.toast(on ? 'Added to your watchlist.' + (mins > 0 ? ' We will email you ' + mins + ' minutes before bidding opens.' : '') : 'Removed from your watchlist.', 'good');
+    }).catch(function () {
+      KA.toast('No connection to the server. Your watchlist was not updated.', 'bad');
+    }).then(function () { btn.disabled = false; });
+  });
+
   // In-page section links (auction page): mark the last section whose top has scrolled past the bar.
   var spy = Array.prototype.slice.call(document.querySelectorAll('.subnav a[href^="#"]'));
   if (spy.length) {

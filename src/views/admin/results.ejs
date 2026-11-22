@@ -23,6 +23,7 @@
   <% if (auctionId) { %><a href="<%= urlWith({ auction: '', page: '' }) %>">All auctions</a><% } %>
 </form>
 
+<% var showComm = filter === 'awarded' || filter === 'pending'; %>
 <div class="table-wrap">
 <% if (!rows.length) { %>
   <div class="empty">
@@ -30,9 +31,10 @@
     <% } else { %><h3>No lots here</h3><p>No closed lot<%= auctionId ? ' in this auction' : '' %> has the result "<%= FILTERS[filter] %>".</p><% } %>
   </div>
 <% } else { %>
-  <table class="table table-stack">
+  <table class="table table-stack bl-results">
     <thead><tr>
-      <th>Lot</th><th>Highest bidder</th><th class="num">Highest bid</th><th class="num">Reserve</th><th class="num">Total value</th><th>Closed</th>
+      <th>Lot</th><th>Highest bidder</th><th class="num">Highest bid</th><th class="num">Reserve</th><th class="num">Total value</th>
+      <% if (showComm) { %><th class="num">Commission</th><th class="num">Buyer pays</th><% } %><th>Closed</th>
       <th><%= filter === 'no_bids' ? '' : (filter === 'pending' ? 'Decision' : 'Change decision') %></th>
     </tr></thead>
     <tbody>
@@ -45,6 +47,10 @@
         <td class="num" data-label="Highest bid"><b><%= fmtINR(r.amount) %></b></td>
         <td class="num" data-label="Reserve"><%= r.reserve_price === null ? 'None' : fmtINR(r.reserve_price) %><% if (r.reserve_price !== null && r.amount !== null) { %><span class="sub <%= met ? 'good' : 'bad' %>"><%= met ? 'Met' : 'Not met' %></span><% } %></td>
         <td class="num" data-label="Total value"><%= r.amount !== null ? fmtINR(Math.round(r.amount * r.quantity * 100) / 100) : '' %></td>
+        <% if (showComm) { %>
+        <td class="num" data-label="Commission"><% if (r.value !== undefined) { %><%= fmtINR(r.commission) || '₹0' %><span class="sub"><%= fmtNum(r.pct) %>%<%= r.result === 'pending' ? ' if awarded' : '' %></span><% } %></td>
+        <td class="num" data-label="Buyer pays"><% if (r.value !== undefined) { %><b><%= fmtINR(r.payable) %></b><span class="sub"><%= r.commission > 0 ? 'incl. GST' : 'material only' %></span><% } %></td>
+        <% } %>
         <td data-label="Closed" class="nowrap"><%= fmtDT(r.ends_at) %></td>
         <td class="actions">
           <% if (r.user_id && r.result !== 'no_bids') { %>
@@ -55,6 +61,15 @@
       </tr>
     <% }) %>
     </tbody>
+    <% if (showComm) { %>
+    <tfoot><tr>
+      <td colspan="4">Totals on this page</td>
+      <td class="num"><%= fmtINR(sums.value) || '₹0' %></td>
+      <td class="num"><%= fmtINR(sums.commission) || '₹0' %></td>
+      <td class="num"><%= fmtINR(sums.payable) || '₹0' %></td>
+      <td colspan="2"></td>
+    </tr></tfoot>
+    <% } %>
   </table>
 <% } %>
 </div>

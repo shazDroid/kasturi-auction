@@ -1,0 +1,88 @@
+<%
+  var big = out.total !== undefined && out.total > HTML_CAP;
+%>
+<div class="page-head">
+  <div>
+    <h1>Reports</h1>
+    <p>Choose a report and a period. Every report downloads as Excel or CSV. All dates are IST.</p>
+  </div>
+</div>
+
+<div class="bl-report-bar">
+  <form class="filters" method="get" action="/admin/reports">
+    <label for="r">Report</label>
+    <select id="r" name="r">
+      <% Object.keys(REPORTS).forEach(function (k) { %><option value="<%= k %>" <%= p.key === k ? 'selected' : '' %>><%= REPORTS[k].name %></option><% }) %>
+    </select>
+    <label for="from">From</label>
+    <input type="date" id="from" name="from" value="<%= p.from %>" required>
+    <label for="to">to</label>
+    <input type="date" id="to" name="to" value="<%= p.to %>" required>
+    <button class="btn" type="submit">Show report</button>
+  </form>
+  <nav class="bl-presets" aria-label="Quick periods">
+    <span>Quick periods:</span>
+    <% Object.keys(PRESETS).forEach(function (k) { %><a href="/admin/reports?<%= presetQs(k) %>" <%- p.preset === k ? 'aria-current="true"' : '' %>><%= PRESETS[k] %></a><% }) %>
+    <% if (p.preset === 'custom') { %><span>(custom period)</span><% } %>
+  </nav>
+</div>
+
+<div class="bl-report-head">
+  <div>
+    <h2><%= REPORTS[p.key].name %></h2>
+    <p><%= fmtDate(p.from + 'T12:00:00+05:30') %> to <%= fmtDate(p.to + 'T12:00:00+05:30') %>. <%= REPORTS[p.key].help %></p>
+  </div>
+  <div class="row">
+    <a class="btn btn-quiet" href="/admin/reports/export?<%= qs({ format: 'xlsx' }) %>">Download Excel</a>
+    <a class="btn btn-quiet" href="/admin/reports/export?<%= qs({ format: 'csv' }) %>">Download CSV</a>
+  </div>
+</div>
+
+<% if (out.chart) { var c = out.chart; %>
+  <figure class="bl-chart">
+    <h3><%= c.title %></h3>
+    <svg viewBox="0 0 <%= c.W %> <%= c.H %>" role="img" aria-label="<%= c.title %>: <%= c.bars.map(function (b) { return b.title + ' ' + fmtINR(b.value); }).join(', ') %>">
+      <% c.ticks.forEach(function (t) { %>
+        <line class="<%= t.v === 0 ? 'bl-axis' : 'bl-grid' %>" x1="<%= c.left %>" x2="<%= c.W - c.right %>" y1="<%= t.y.toFixed(1) %>" y2="<%= t.y.toFixed(1) %>"></line>
+        <text class="bl-tick" x="<%= c.left - 6 %>" y="<%= (t.y + 4).toFixed(1) %>" text-anchor="end"><%= t.label %></text>
+      <% }) %>
+      <% c.bars.forEach(function (b) { %>
+        <g>
+          <title><%= b.title %>: <%= fmtINR(b.value) %></title>
+          <% if (b.h > 0) { %><rect class="bl-bar" fill="#1d3552" x="<%= b.x.toFixed(1) %>" y="<%= b.y.toFixed(1) %>" width="<%= b.w.toFixed(1) %>" height="<%= b.h.toFixed(1) %>"></rect><% } %>
+          <% if (b.showLabel) { %><text class="bl-tick" x="<%= (b.x + b.w / 2).toFixed(1) %>" y="<%= c.baseY + 16 %>" text-anchor="middle"><%= b.label %></text><% } %>
+        </g>
+      <% }) %>
+    </svg>
+    <p>Values in rupees (K thousand, L lakh, Cr crore). <%= c.note %> Point at a bar for the exact figure.</p>
+  </figure>
+<% } %>
+
+<% out.tables.forEach(function (t) { %>
+  <section class="<%= out.tables.length > 1 ? 'admin-section' : '' %>">
+    <% if (out.tables.length > 1) { %><h2><%= t.name %></h2><% } %>
+    <div class="table-wrap">
+    <% if (!t.rows.length) { %>
+      <div class="empty"><h3>Nothing in this period</h3><p>Choose a longer period, for example this financial year or last financial year.</p></div>
+    <% } else { %>
+      <table class="table bl-table">
+        <thead><tr><% t.columns.forEach(function (col) { %><th class="<%= NUMERIC.indexOf(col.type) >= 0 ? 'num' : '' %>"><%= col.header %></th><% }) %></tr></thead>
+        <tbody>
+        <% t.rows.slice(0, HTML_CAP).forEach(function (r) { %>
+          <tr>
+          <% t.columns.forEach(function (col) { var v = fmtCell(r[col.key], col.type); var href = col.link ? col.link(r) : null; %>
+            <td class="<%= NUMERIC.indexOf(col.type) >= 0 ? 'num' : '' %><%= col.wrap ? ' bl-wrap' : '' %>"><% if (href && v) { %><a href="<%= href %>"><%= v %></a><% } else { %><%= v %><% } %></td>
+          <% }) %>
+          </tr>
+        <% }) %>
+        </tbody>
+        <% if (t.totals) { %>
+        <tfoot><tr><% t.columns.forEach(function (col) { %><td class="<%= NUMERIC.indexOf(col.type) >= 0 ? 'num' : '' %>"><%= fmtCell(t.totals[col.key], col.type) %></td><% }) %></tr></tfoot>
+        <% } %>
+      </table>
+    <% } %>
+    </div>
+    <% if (t.note) { %><p class="bl-cap"><%= t.note %></p><% } %>
+  </section>
+<% }) %>
+<% if (big) { %><p class="bl-cap">The page shows the first <%= fmtNum(HTML_CAP) %> of <%= fmtNum(out.total) %> rows. Download Excel or CSV for all of them.</p><% } %>

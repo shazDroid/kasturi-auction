@@ -11,12 +11,16 @@
 //       .js-action          bid form (.bid-form, .bid-confirm, .bid-msg) or the result tag
 //       [data-step=N]       optional quick-step buttons (current highest + N increments)
 //       .js-live-tag        optional Live / Closed badge
+//       .js-abnote          optional "Auto-bid up to" note (auction page rows), .js-abmax inside
+//       .js-autobid         optional auto-bid box (lot page): .js-ab-status, .ab-form, .ab-confirm, .ab-stop, .ab-msg
+//   data-state-url on the root overrides the state URL (admin preview with ?as_group=).
 //   #rb-clock, #rb-conn, #rb-conn-text, #rb-open, #rb-leading, #rb-last, #rb-phase, [data-last-close]   optional
 (function () {
   var root = document.querySelector('[data-room]');
   if (!root) return;
 
   var auctionId = root.getAttribute('data-auction');
+  var stateUrl = root.getAttribute('data-state-url') || '/auctions/' + auctionId + '/state';
   var phase = root.getAttribute('data-phase');
   var startsAt = Number(root.getAttribute('data-starts'));
   var signedIn = root.getAttribute('data-user') === '1';
@@ -61,7 +65,7 @@
   function patchUnit(u, l) {
     var unit = u.getAttribute('data-unit');
     var wasOpen = u.getAttribute('data-status') === 'open';
-    var sig = [l.status, l.result, l.highest, l.bids, l.endsAt, l.leading, l.myBid].join('|');
+    var sig = [l.status, l.result, l.highest, l.bids, l.endsAt, l.leading, l.myBid, l.myMax].join('|');
     var changed = u.getAttribute('data-sig') !== null && u.getAttribute('data-sig') !== sig;
     u.setAttribute('data-sig', sig);
     u.setAttribute('data-status', l.status);
@@ -134,8 +138,42 @@
         }
       }
     }
+    patchAuto(u, l);
     if (changed) {
       u.classList.remove('flash'); void u.offsetWidth; u.classList.add('flash');
+    }
+  }
+
+  // Auto-bid note (auction page) and auto-bid box (lot page) from state.myMax.
+  function patchAuto(u, l) {
+    var mine = signedIn && l.status === 'open' && l.myMax !== null && l.myMax !== undefined;
+    var passed = mine && !l.leading && l.myMax < l.minBid;
+    var note = u.querySelector('.js-abnote');
+    if (note) {
+      note.classList.toggle('hide', !mine);
+      var nb = note.querySelector('.js-abmax');
+      if (nb) nb.textContent = mine ? KA.inr(l.myMax) : '';
+    }
+    var box = u.querySelector('.js-autobid');
+    if (!box) return;
+    if (l.status !== 'open') { box.classList.add('hide'); return; }
+    var st = box.querySelector('.js-ab-status');
+    if (st) {
+      st.classList.toggle('hide', !mine);
+      st.classList.toggle('out', passed);
+      st.innerHTML = !mine ? '' : passed
+        ? 'Your maximum of <b class="js-abmax">' + esc(KA.inr(l.myMax)) + '</b> has been passed'
+        : 'Auto-bid on up to <b class="js-abmax">' + esc(KA.inr(l.myMax)) + '</b>';
+    }
+    var stop = box.querySelector('.ab-stop');
+    if (stop) stop.classList.toggle('hide', !mine);
+    var set = box.querySelector('.js-ab-set');
+    if (set && !set.disabled) set.textContent = mine ? 'Update maximum' : 'Set auto-bid';
+    var input = box.querySelector('input[name=max]');
+    if (input) {
+      input.placeholder = 'At least ' + l.minBid;
+      var asking = !box.querySelector('.ab-confirm').classList.contains('hide');
+      if (document.activeElement !== input && !input.getAttribute('data-dirty') && !asking) input.value = mine ? l.myMax : '';
     }
   }
 
@@ -170,7 +208,7 @@
   var inflight = null, again = false;
   function refresh() {
     if (inflight) { again = true; return inflight; }
-    inflight = fetch('/auctions/' + auctionId + '/state', { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' })
+    inflight = fetch(stateUrl, { credentials: 'same-origin', headers: { Accept: 'application/json' }, cache: 'no-store' })
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(apply)
       .catch(function () {})
@@ -227,7 +265,7 @@
 
   /* ---------- Bidding ---------- */
   root.addEventListener('input', function (e) {
-    if (e.target.name === 'amount') e.target.setAttribute('data-dirty', '1');
+    if (e.target.name === 'amount' || e.target.name === 'max') e.target.setAttribute('data-dirty', '1');
   });
 
   // Quick steps: current highest bid plus N increments (the minimum bid is one increment).
@@ -246,15 +284,26 @@
   });
 
   function showMsg(msg, text, kind, holdMs) {
-    msg.className = 'bid-msg ' + (kind || '');
+    msg.className = 'bid-msg' + (msg.classList.contains('ab-msg') ? ' ab-msg' : '') + (kind ? ' ' + kind : '');
     msg.textContent = text;
     msg.setAttribute('data-hold', '1');
     clearTimeout(msg._t);
     msg._t = setTimeout(function () {
       msg.removeAttribute('data-hold');
       var u = unitOf(msg);
+      if (!msg.hasAttribute('data-min')) { msg.classList.remove('ok', 'err'); msg.textContent = ''; return; }
       if (u && msg.isConnected) setMin(msg, u.getAttribute('data-unit'));
     }, holdMs || 6000);
+  }
+
+  function post(url, body) {
+    return fetch(url, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'x-csrf-token': csrf },
+      body: JSON.stringify(body || {})
+    }).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (d) { return { ok: r.ok, d: d }; });
+    });
   }
 
   function send(form, amount) {
@@ -273,7 +322,8 @@
     }).then(function (res) {
       if (res.ok && res.d.ok) {
         form.querySelector('input[name=amount]').removeAttribute('data-dirty');
-        showMsg(msg, 'Bid placed' + (res.d.extended ? '. Closing time extended.' : ''), 'ok', 5000);
+        if (res.d.leading === false) showMsg(msg, "Bid placed, but another bidder's auto-bid is higher. Bid again to take the lead.", 'err', 9000);
+        else showMsg(msg, 'Bid placed' + (res.d.extended ? '. Closing time extended.' : ''), 'ok', 5000);
       } else {
         showMsg(msg, res.d.error || 'The bid was not accepted. Try again.', 'err', 9000);
       }
@@ -294,7 +344,97 @@
     action.querySelector('.bid-form button[type=submit]').disabled = false;
   }
 
+  /* ---------- Auto-bid (lot page) ---------- */
+  var NO_CONN = 'No connection to the server. Check your internet and try again.';
+
+  function sendAuto(form, max) {
+    var u = unitOf(form);
+    var box = form.closest('.js-autobid');
+    var msg = box.querySelector('.ab-msg');
+    var btn = form.querySelector('button[type=submit]');
+    btn.disabled = true;
+    btn.textContent = 'Saving';
+    post(form.getAttribute('action'), { max: max }).then(function (res) {
+      if (res.ok && res.d.ok) {
+        form.querySelector('input[name=max]').removeAttribute('data-dirty');
+        btn.textContent = 'Update maximum';
+        if (res.d.leading) showMsg(msg, 'Auto-bid on up to ' + KA.inr(res.d.max) + '. You are leading.', 'ok', 7000);
+        else showMsg(msg, 'Auto-bid on up to ' + KA.inr(res.d.max) + ", but another bidder's maximum is higher. Raise your maximum to take the lead.", 'err', 10000);
+      } else {
+        showMsg(msg, res.d.error || 'Your auto-bid was not saved. Try again.', 'err', 9000);
+      }
+    }).catch(function () {
+      showMsg(msg, NO_CONN + ' Your auto-bid was not saved.', 'err', 9000);
+    }).then(function () {
+      btn.disabled = false;
+      if (btn.textContent === 'Saving') btn.textContent = 'Set auto-bid';
+      if (u) u.removeAttribute('data-sig');
+      refresh();
+    });
+  }
+
+  function closeAutoConfirm(box) {
+    var c = box.querySelector('.ab-confirm');
+    c.classList.add('hide');
+    c.innerHTML = '';
+    box.querySelector('.ab-form button[type=submit]').disabled = false;
+  }
+
   root.addEventListener('submit', function (e) {
+    var stop = e.target.closest('.ab-stop');
+    if (stop) {
+      e.preventDefault();
+      var sbox = stop.closest('.js-autobid');
+      var sbtn = stop.querySelector('button');
+      sbtn.disabled = true;
+      post(stop.getAttribute('action')).then(function (res) {
+        if (res.ok && res.d.ok) {
+          var inp = sbox.querySelector('input[name=max]');
+          inp.value = ''; inp.removeAttribute('data-dirty');
+          showMsg(sbox.querySelector('.ab-msg'), 'Auto-bid stopped. Bids already placed for you stand.', 'ok', 7000);
+        } else {
+          showMsg(sbox.querySelector('.ab-msg'), res.d.error || 'Your auto-bid was not stopped. Try again.', 'err', 9000);
+        }
+      }).catch(function () {
+        showMsg(sbox.querySelector('.ab-msg'), NO_CONN, 'err', 9000);
+      }).then(function () {
+        sbtn.disabled = false;
+        var su = unitOf(stop); if (su) su.removeAttribute('data-sig');
+        refresh();
+      });
+      return;
+    }
+
+    var abForm = e.target.closest('.ab-form');
+    if (abForm) {
+      e.preventDefault();
+      var box = abForm.closest('.js-autobid');
+      var amsg = box.querySelector('.ab-msg');
+      var araw = String(abForm.querySelector('input[name=max]').value).replace(/[,\s₹]/g, '');
+      var max = Number(araw);
+      if (!araw || !isFinite(max) || max <= 0) {
+        showMsg(amsg, 'Enter your maximum in rupees, for example 45000.', 'err');
+        return;
+      }
+      var bidMsg = unitOf(abForm).querySelector('.js-action .bid-msg');
+      var amin = bidMsg ? Number(bidMsg.getAttribute('data-min')) : 0;
+      if (amin && max > amin * 3) {
+        // A maximum far above the minimum bid is usually a typing mistake, so ask once, in the page.
+        var ask = box.querySelector('.ab-confirm');
+        ask.innerHTML = '<span class="small">That is ' + Math.round(max / amin * 10) / 10 + ' times the minimum bid of ' + esc(KA.inr(amin)) + '.</span>' +
+          '<button type="button" class="btn btn-accent btn-sm js-yes">Set maximum ' + esc(KA.inr(max)) + '</button>' +
+          '<button type="button" class="btn btn-quiet btn-sm js-no">Cancel</button>';
+        ask.classList.remove('hide');
+        abForm.querySelector('button[type=submit]').disabled = true;
+        ask.querySelector('.js-yes').addEventListener('click', function () { closeAutoConfirm(box); sendAuto(abForm, max); });
+        ask.querySelector('.js-no').addEventListener('click', function () { closeAutoConfirm(box); abForm.querySelector('input[name=max]').focus(); });
+        ask.querySelector('.js-yes').focus();
+        return;
+      }
+      sendAuto(abForm, max);
+      return;
+    }
+
     var form = e.target.closest('.bid-form');
     if (!form) return;
     e.preventDefault();

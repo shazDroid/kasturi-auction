@@ -42,21 +42,25 @@ router.get('/payments', wrap(async (req, res) => {
   );
   const pg = paginate(totals.n, req.query.page, 50);
   const rows = await db.many(
-    `SELECT p.*, u.name, u.company_name, u.fee_paid_until ${FROM} ${where} ORDER BY p.id DESC LIMIT $6 OFFSET $7`,
+    `SELECT p.*, u.name, u.company_name, u.fee_paid_until, inv.id AS inv_id, inv.number AS inv_number
+       ${FROM} LEFT JOIN invoices inv ON inv.payment_id = p.id ${where} ORDER BY p.id DESC LIMIT $6 OFFSET $7`,
     [...params, pg.per, pg.offset]
   );
-  res.adminPage('admin/payments', { title: 'Payments', rows, totals, pg, f, STATUSES, METHODS, rpOn: razorpay.configured() });
+  const missingInvoices = (await db.one(
+    `SELECT count(*)::int AS n FROM payments p WHERE p.status = 'paid' AND p.purpose = 'registration_fee'
+        AND NOT EXISTS (SELECT 1 FROM invoices i WHERE i.payment_id = p.id)`)).n;
+  res.adminPage('admin/payments', { title: 'Payments', rows, totals, pg, f, STATUSES, METHODS, rpOn: razorpay.configured(), missingInvoices });
 }));
 
 router.get('/payments.csv', wrap(async (req, res) => {
   const { where, params } = filterSql(req.query);
-  const rows = await db.many(`SELECT p.*, u.name, u.company_name, u.email, u.gstin ${FROM} ${where} ORDER BY p.id`, params);
+  const rows = await db.many(`SELECT p.*, u.name, u.company_name, u.email, u.gstin, inv.number AS inv_number ${FROM} LEFT JOIN invoices inv ON inv.payment_id = p.id ${where} ORDER BY p.id`, params);
   const out = [['Payment id', 'Created (IST)', 'Paid (IST)', 'Bidder no', 'Bidder', 'Company', 'GSTIN', 'Email', 'Purpose',
-    'Base (INR)', 'GST (INR)', 'Total (INR)', 'Method', 'Status', 'Razorpay order', 'Razorpay payment', 'Note']];
+    'Base (INR)', 'GST (INR)', 'Total (INR)', 'Method', 'Status', 'Razorpay order', 'Razorpay payment', 'Note', 'Invoice']];
   for (const p of rows) {
     out.push([p.id, fmtDT(p.created_at), fmtDT(p.paid_at), bidderNo(p.user_id), p.name, p.company_name, p.gstin, p.email,
       p.purpose === 'registration_fee' ? 'Registration fee' : p.purpose, p.base_amount, p.tax_amount, p.amount,
-      p.method === 'offline' ? 'Offline' : 'Razorpay', p.status, p.rp_order_id || '', p.rp_payment_id || '', p.note]);
+      p.method === 'offline' ? 'Offline' : 'Razorpay', p.status, p.rp_order_id || '', p.rp_payment_id || '', p.note, p.inv_number || '']);
   }
   audit(req, 'payment.export', `${rows.length} rows`);
   sendCsv(res, `payments-${new Date().toISOString().slice(0, 10)}.csv`, out);
@@ -81,7 +85,8 @@ router.post('/payments/:id(\\d+)/mark-refunded', wrap(async (req, res) => {
 router.get('/payments/:id(\\d+)/refund', wrap(async (req, res) => {
   const p = await db.one('SELECT p.*, u.name, u.company_name, u.fee_paid_until FROM payments p JOIN users u ON u.id = p.user_id WHERE p.id = $1', [req.params.id]);
   if (!p) return notFound(res, 'This payment');
-  res.adminPage('admin/payment_refund', { title: `Refund payment #${p.id}`, p, feeText: payments.validUntilText(p.fee_paid_until) });
+  const inv = await db.one('SELECT id, number FROM invoices WHERE payment_id = $1', [p.id]);
+  res.adminPage('admin/payment_refund', { title: `Refund payment #${p.id}`, p, inv, feeText: payments.validUntilText(p.fee_paid_until) });
 }));
 
 module.exports = router;

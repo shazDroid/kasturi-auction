@@ -1,0 +1,154 @@
+<%
+  var invTag = function (st) { return { unpaid: 'tag tag-warn', part_paid: 'tag tag-upcoming', paid: 'tag tag-ok', cancelled: 'tag' }[st] || 'tag'; };
+  var invLabel = { unpaid: 'Unpaid', part_paid: 'Part paid', paid: 'Paid', cancelled: 'Cancelled' };
+  var b = s.buyer;
+  var here = '/admin/billing/sale-orders/' + so.id;
+%>
+<div class="page-head">
+  <div>
+    <h1>Sale order <%= so.number %></h1>
+    <p>Issued <%= fmtDT(so.issued_at) %><%= so.issued_by_name ? ' by ' + so.issued_by_name : '' %> to <a href="/admin/bidders/<%= so.user_id %>"><%= so.name %></a>. The details below are frozen as issued.</p>
+  </div>
+  <div class="row">
+    <a class="btn btn-quiet" href="<%= here %>.pdf" target="_blank" rel="noopener">Open PDF</a>
+    <a class="btn btn-quiet" href="<%= here %>.pdf?download=1">Download PDF</a>
+    <form method="post" action="<%= here %>/email" class="inline-form"><%- include('_csrf') %>
+      <button class="btn btn-quiet" type="submit" data-confirm="Email this sale order to <%= so.email %> again?">Email again</button>
+    </form>
+  </div>
+</div>
+
+<% if (so.result !== 'awarded') { %>
+  <div class="notice notice-warn"><p>The award on this lot has since been changed to "<%= label('result', so.result) %>". This sale order stays on record; tell the buyer that it no longer applies.</p></div>
+<% } %>
+
+<div class="cols">
+  <div>
+    <article class="panel bl-doc">
+      <div class="panel-body">
+        <header class="bl-doc-head">
+          <div>
+            <h2><%= s.company.name %></h2>
+            <p class="muted small"><%= [s.company.address, s.company.gstin ? 'GSTIN ' + s.company.gstin : '', s.company.state].filter(Boolean).join(', ') %></p>
+          </div>
+          <dl class="bl-facts">
+            <dt>Number</dt><dd><%= so.number %></dd>
+            <dt>Date</dt><dd><%= fmtDate(s.issued_at) %></dd>
+            <dt>Auction closed</dt><dd><%= fmtDate(s.auction.closed_at) %></dd>
+          </dl>
+        </header>
+        <div class="cols-even bl-parties">
+          <section>
+            <h3>Buyer</h3>
+            <p><b><%= b.company || b.name %></b><% if (b.company) { %><br><%= b.name %><% } %>
+              <% if (b.address) { %><br><%= b.address %><% } %>
+              <% if (b.city || b.state || b.pincode) { %><br><%= [b.city, b.state, b.pincode].filter(Boolean).join(', ') %><% } %></p>
+            <p class="small">GSTIN: <%= b.gstin || 'not registered' %><% if (b.pan) { %>, PAN: <%= b.pan %><% } %><br>Bidder no.: <%= b.bidder_no %></p>
+          </section>
+          <section>
+            <h3>Auction and material</h3>
+            <dl class="kv bl-kv">
+              <dt>Auction</dt><dd><a href="/admin/auctions/<%= s.auction.id %>"><%= s.auction.title %></a></dd>
+              <dt>Lot</dt><dd><a href="/admin/lots/<%= s.lot.id %>">Lot <%= s.lot.lot_no %>: <%= s.lot.title %></a></dd>
+              <dt>Seller</dt><dd><%= s.seller.name || 'Not given' %></dd>
+              <dt>Location</dt><dd><%= s.auction.location || s.seller.location || 'As per auction terms' %></dd>
+            </dl>
+          </section>
+        </div>
+        <div class="table-wrap flat bl-lines">
+          <table class="table">
+            <thead><tr><th>Description</th><th class="num">Quantity</th><th class="num">Rate</th><th class="num">Material value</th></tr></thead>
+            <tbody><tr>
+              <td><%= s.lot.title %><% if (s.lot.specs && s.lot.specs.length) { %><span class="sub"><%= s.lot.specs.map(function (x) { return x.label + ': ' + x.value; }).join('; ') %></span><% } %></td>
+              <td class="num nowrap"><%= fmtNum(s.lot.quantity) %> <%= s.lot.unit %></td>
+              <td class="num nowrap"><%= fmtINR(s.rate) %> per <%= s.lot.unit %></td>
+              <td class="num nowrap"><b><%= fmtINR(s.material_value) %></b></td>
+            </tr></tbody>
+          </table>
+        </div>
+        <table class="bl-totals">
+          <tr class="is-strong"><th>Material value payable to the seller</th><td><%= fmtINR(s.material_value) %></td></tr>
+          <tr><th>Buyer's commission at <%= fmtNum(s.commission_percent) %>%</th><td><%= fmtINR(s.commission) || '₹0' %></td></tr>
+          <% (s.tax_lines || []).forEach(function (t) { %><tr><th><%= t.code %> at <%= fmtNum(t.rate) %>%</th><td><%= fmtINR(t.amount) %></td></tr><% }) %>
+          <tr class="is-strong"><th>Commission payable to <%= s.company.name %></th><td><%= fmtINR(s.commission_total) || '₹0' %></td></tr>
+        </table>
+        <% if (s.auction.inspection) { %><h3 class="bl-h">Inspection and lifting</h3><div class="bl-pre small"><%= s.auction.inspection %></div><% } %>
+        <% if (s.terms) { %><h3 class="bl-h">Terms of this sale order</h3><div class="bl-pre small"><%= s.terms %></div><% } %>
+        <% if (s.auction.terms) { %>
+          <details class="ax-details mt"><summary>Auction terms as issued</summary><div class="bl-pre small"><%= s.auction.terms %></div></details>
+        <% } %>
+      </div>
+    </article>
+  </div>
+
+  <div class="side-stack">
+    <div class="panel">
+      <div class="panel-head"><h3>Commission invoice</h3></div>
+      <div class="panel-body">
+        <% if (activeInvoice) { %>
+          <p><a href="/admin/billing/invoices/<%= activeInvoice.id %>"><b><%= activeInvoice.number %></b></a> <span class="<%= invTag(activeInvoice.status) %>"><%= invLabel[activeInvoice.status] %></span></p>
+          <p class="small muted">Total <%= fmtINR(activeInvoice.total) %>, paid <%= fmtINR(activeInvoice.paid) || '₹0' %><%= activeInvoice.due_at ? ', due ' + fmtDate(activeInvoice.due_at) : '' %>.</p>
+        <% } else if (so.result !== 'awarded') { %>
+          <p class="muted">No invoice can be raised: the lot is no longer awarded.</p>
+        <% } else if (commissionNow && commissionNow.commission > 0) { %>
+          <p>No invoice yet. Commission <%= fmtINR(commissionNow.commission) %> (<%= fmtNum(commissionNow.percent) %>%) plus GST.</p>
+          <form method="post" action="/admin/billing/lots/<%= so.lot_id %>/commission-invoice"><%- include('_csrf') %>
+            <input type="hidden" name="back" value="<%= here %>">
+            <button class="btn" type="submit" data-confirm="Issue the commission invoice to <%= so.name %>? It is emailed.">Issue commission invoice</button>
+          </form>
+        <% } else { %>
+          <p class="muted">No commission is payable on this lot.</p>
+        <% } %>
+        <% invoices.filter(function (i) { return i.status === 'cancelled'; }).forEach(function (i) { %>
+          <p class="small muted">Cancelled: <a href="/admin/billing/invoices/<%= i.id %>"><%= i.number %></a></p>
+        <% }) %>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head"><h3>Settlement</h3></div>
+      <div class="panel-body">
+        <div class="bl-settle">
+          <div>
+            <b>Buyer's payment to the seller</b>
+            <% if (so.buyer_paid_at) { %>
+              <p><span class="tag tag-ok">Received</span> <%= fmtDate(so.buyer_paid_at) %></p>
+              <form method="post" action="/admin/billing/lots/<%= so.lot_id %>/settlement"><%- include('_csrf') %>
+                <input type="hidden" name="back" value="<%= here %>"><input type="hidden" name="action" value="undo_buyer_paid">
+                <button class="linkbtn danger" type="submit" data-confirm="Remove the payment received mark?">Undo</button>
+              </form>
+            <% } else { %>
+              <form method="post" action="/admin/billing/lots/<%= so.lot_id %>/settlement" class="bl-settle-form"><%- include('_csrf') %>
+                <input type="hidden" name="back" value="<%= here %>"><input type="hidden" name="action" value="buyer_paid">
+                <label for="bp-date">Date received</label><input type="date" id="bp-date" name="date" value="<%= today %>" max="<%= today %>" required>
+                <label for="bp-note">Note</label><input type="text" id="bp-note" name="note" maxlength="300" placeholder="UTR or confirmation from the seller">
+                <button class="btn btn-sm" type="submit">Mark payment received</button>
+              </form>
+            <% } %>
+          </div>
+          <div>
+            <b>Material lifted</b>
+            <% if (so.lifted_at) { %>
+              <p><span class="tag tag-ok">Lifted</span> <%= fmtDate(so.lifted_at) %></p>
+              <form method="post" action="/admin/billing/lots/<%= so.lot_id %>/settlement"><%- include('_csrf') %>
+                <input type="hidden" name="back" value="<%= here %>"><input type="hidden" name="action" value="undo_lifted">
+                <button class="linkbtn danger" type="submit" data-confirm="Remove the lifted mark?">Undo</button>
+              </form>
+            <% } else { %>
+              <form method="post" action="/admin/billing/lots/<%= so.lot_id %>/settlement" class="bl-settle-form"><%- include('_csrf') %>
+                <input type="hidden" name="back" value="<%= here %>"><input type="hidden" name="action" value="lifted">
+                <label for="lf-date">Date lifted</label><input type="date" id="lf-date" name="date" value="<%= today %>" max="<%= today %>" required>
+                <label for="lf-note">Note</label><input type="text" id="lf-note" name="note" maxlength="300" placeholder="Vehicle number, weighment slip">
+                <button class="btn btn-sm" type="submit">Mark material lifted</button>
+              </form>
+            <% } %>
+          </div>
+        </div>
+        <% if (so.settlement_note) { %>
+          <h4 class="bl-h">History</h4>
+          <div class="bl-pre small muted"><%= so.settlement_note %></div>
+        <% } %>
+      </div>
+    </div>
+  </div>
+</div>
